@@ -1,8 +1,8 @@
-"""OpenRouter API client for making LLM requests."""
+"""LM Studio API client for making local LLM requests."""
 
 import httpx
 from typing import List, Dict, Any, Optional
-from .config import OPENROUTER_API_KEY, OPENROUTER_API_URL
+from .config import LM_STUDIO_API_ENDPOINT
 
 
 async def query_model(
@@ -11,10 +11,10 @@ async def query_model(
     timeout: float = 120.0
 ) -> Optional[Dict[str, Any]]:
     """
-    Query a single model via OpenRouter API.
+    Query a single model via LM Studio API.
 
     Args:
-        model: OpenRouter model identifier (e.g., "openai/gpt-4o")
+        model: LM Studio model identifier (e.g., "microsoft/phi-4-mini-reasoning")
         messages: List of message dicts with 'role' and 'content'
         timeout: Request timeout in seconds
 
@@ -22,7 +22,6 @@ async def query_model(
         Response dict with 'content' and optional 'reasoning_details', or None if failed
     """
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
     }
 
@@ -34,7 +33,7 @@ async def query_model(
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
-                OPENROUTER_API_URL,
+                LM_STUDIO_API_ENDPOINT,
                 headers=headers,
                 json=payload
             )
@@ -49,7 +48,10 @@ async def query_model(
             }
 
     except Exception as e:
-        print(f"Error querying model {model}: {e}")
+        print(f"Error querying model {model} via LM Studio: {e}")
+        # Print more detailed error info for debugging
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         return None
 
 
@@ -58,10 +60,10 @@ async def query_models_parallel(
     messages: List[Dict[str, str]]
 ) -> Dict[str, Optional[Dict[str, Any]]]:
     """
-    Query multiple models in parallel.
+    Query multiple models in parallel via LM Studio.
 
     Args:
-        models: List of OpenRouter model identifiers
+        models: List of LM Studio model identifiers
         messages: List of message dicts to send to each model
 
     Returns:

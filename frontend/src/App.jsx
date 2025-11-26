@@ -9,6 +9,7 @@ function App() {
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [titleGenerationStatus, setTitleGenerationStatus] = useState({}); // conversation_id -> status
 
   // Load conversations on mount
   useEffect(() => {
@@ -21,6 +22,88 @@ function App() {
       loadConversation(currentConversationId);
     }
   }, [currentConversationId]);
+
+  // WebSocket connection for real-time title updates
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.hostname}:8001/ws/title-updates`;
+    
+    const ws = new WebSocket(wsUrl);
+    
+    ws.onopen = () => {
+      console.log('WebSocket connected for title updates');
+    };
+    
+    ws.onmessage = (event) => {
+      try {
+        const update = JSON.parse(event.data);
+        
+        if (update.type === 'title_progress') {
+          const { conversation_id, status, data } = update;
+          
+          // Update title generation status
+          setTitleGenerationStatus(prev => ({
+            ...prev,
+            [conversation_id]: {
+              status,
+              data: data || {},
+              timestamp: update.timestamp
+            }
+          }));
+          
+          // Update conversation title if completed
+          if (status === 'complete_immediate' && data?.title) {
+            setConversations(prev => prev.map(conv => 
+              conv.id === conversation_id 
+                ? { ...conv, title: data.title }
+                : conv
+            ));
+            
+            // Update current conversation if it matches
+            if (currentConversationId === conversation_id && currentConversation) {
+              setCurrentConversation(prev => ({
+                ...prev,
+                title: data.title
+              }));
+            }
+          }
+          
+          // Show progress indicators
+          if (status === 'generating_immediate' || status === 'thinking_immediate') {
+            setConversations(prev => prev.map(conv => 
+              conv.id === conversation_id 
+                ? { ...conv, titleGenerating: true }
+                : conv
+            ));
+          }
+          
+          // Remove progress indicators when complete
+          if (status === 'complete_immediate' || status === 'error_immediate') {
+            setConversations(prev => prev.map(conv => 
+              conv.id === conversation_id 
+                ? { ...conv, titleGenerating: false }
+                : conv
+            ));
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+    
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+    
+    ws.onclose = () => {
+      console.log('WebSocket connection closed');
+    };
+    
+    // Cleanup on component unmount
+    return () => {
+      ws.close();
+    };
+  }, [currentConversationId, currentConversation]);
 
   const loadConversations = async () => {
     try {
@@ -44,7 +127,12 @@ function App() {
     try {
       const newConv = await api.createConversation();
       setConversations([
-        { id: newConv.id, created_at: newConv.created_at, message_count: 0 },
+        { 
+          id: newConv.id, 
+          created_at: newConv.created_at, 
+          title: newConv.title,
+          message_count: 0 
+        },
         ...conversations,
       ]);
       setCurrentConversationId(newConv.id);
@@ -53,8 +141,29 @@ function App() {
     }
   };
 
+  const handleDeleteConversation = (conversationId) => {
+    // Remove from conversations list
+    setConversations(prev => prev.filter(conv => conv.id !== conversationId));
+    
+    // If the deleted conversation was active, clear the selection
+    if (currentConversationId === conversationId) {
+      setCurrentConversationId(null);
+      setCurrentConversation(null);
+    }
+  };
+
+  const handleRestoreConversation = (conversationId) => {
+    // Refresh the conversations list to include restored conversation
+    loadConversations();
+  };
+
   const handleSelectConversation = (id) => {
     setCurrentConversationId(id);
+  };
+
+  // Check if new conversation button should be disabled
+  const isNewConversationDisabled = () => {
+    return currentConversation && currentConversation.messages.length === 0;
   };
 
   const handleSendMessage = async (content) => {
@@ -188,6 +297,10 @@ function App() {
         currentConversationId={currentConversationId}
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
+        onDeleteConversation={handleDeleteConversation}
+        onRestoreConversation={handleRestoreConversation}
+        newConversationDisabled={isNewConversationDisabled()}
+        titleGenerationStatus={titleGenerationStatus}
       />
       <ChatInterface
         conversation={currentConversation}

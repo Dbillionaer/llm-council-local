@@ -2,13 +2,24 @@
 
 ![llmcouncil](header.jpg)
 
-The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses OpenRouter to send your query to multiple LLMs, it then asks them to review and rank each other's work, and finally a Chairman LLM produces the final response.
+The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses LM Studio to send your query to multiple LLMs, it then asks them to review and rank each other's work across multiple deliberation rounds, and finally a Chairman LLM produces the final response.
 
 In a bit more detail, here is what happens when you submit a query:
 
 1. **Stage 1: First opinions**. The user query is given to all LLMs individually, and the responses are collected. The individual responses are shown in a "tab view", so that the user can inspect them all one by one.
-2. **Stage 2: Review**. Each individual LLM is given the responses of the other LLMs. Under the hood, the LLM identities are anonymized so that the LLM can't play favorites when judging their outputs. The LLM is asked to rank them in accuracy and insight.
-3. **Stage 3: Final response**. The designated Chairman of the LLM Council takes all of the model's responses and compiles them into a single final answer that is presented to the user.
+2. **Stage 2: Multi-Round Deliberation**. Each individual LLM is given the responses of the other LLMs. Under the hood, the LLM identities are anonymized so that the LLM can't play favorites when judging their outputs. The LLM is asked to rank them in accuracy and insight. In multi-round mode (configurable), models can refine their responses based on peer feedback across multiple rounds of review.
+3. **Stage 3: Final response**. The designated Chairman of the LLM Council takes all of the model's responses and rankings from all deliberation rounds and compiles them into a single final answer that is presented to the user.
+
+## Key Features
+
+- **Multi-Round Deliberation**: Configurable rounds of iterative review and refinement
+- **Background Title Generation**: Automatic meaningful titles for conversations with immediate generation for active sessions
+- **Conversation Management**: Recycle bin system for safe conversation deletion and recovery
+- **Smart Interface**: ID-based conversation labeling and intelligent button state management
+- **Thinking Model Support**: Special display for reasoning models with expandable thinking sections  
+- **Real-time Streaming**: Live progress updates during title generation and deliberation
+- **Dynamic Configuration**: Change models and settings without code modifications
+- **Local Privacy**: All processing happens locally via LM Studio - no data sent to external services
 
 ## Vibe Code Alert
 
@@ -32,37 +43,196 @@ npm install
 cd ..
 ```
 
-### 2. Configure API Key
+### 2. Setup LM Studio
 
-Create a `.env` file in the project root:
+**Install and configure LM Studio:**
 
-```bash
-OPENROUTER_API_KEY=sk-or-v1-...
+1. Download and install [LM Studio](https://lmstudio.ai/)
+2. Download the following models:
+   - `microsoft/phi-4-mini-reasoning`
+   - `apollo-v0.1-4b-thinking-qx86x-hi-mlx`
+   - `ai21-jamba-reasoning-3b-hi-mlx`
+   - `qwen/qwen3-4b-thinking-2507`
+3. Start LM Studio server (IP will be auto-detected or use localhost as fallback)
+4. Load all models in LM Studio
+
+### 3. Configure Server & Models
+
+The application automatically detects your local IP and validates model availability. Server and model settings are configured via `config.json` in the project root.
+
+**Server Configuration:**
+```json
+{
+  "server": {
+    "ip": "",
+    "port": "11434", 
+    "base_url_template": "http://{ip}:{port}/v1"
+  }
+}
 ```
 
-Get your API key at [openrouter.ai](https://openrouter.ai/). Make sure to purchase the credits you need, or sign up for automatic top up.
+- `ip`: Leave empty for auto-detection, or specify a custom IP address
+- `port`: LM Studio server port (default: 11434)
+- `base_url_template`: URL template for API endpoints
 
-### 3. Configure Models (Optional)
+**Model Configuration:**
 
-Edit `backend/config.py` to customize the council:
-
-```python
-COUNCIL_MODELS = [
-    "openai/gpt-5.1",
-    "google/gemini-3-pro-preview",
-    "anthropic/claude-sonnet-4.5",
-    "x-ai/grok-4",
-]
-
-CHAIRMAN_MODEL = "google/gemini-3-pro-preview"
+```json
+{
+  "models": {
+    "council": [
+      {
+        "id": "microsoft/phi-4-mini-reasoning",
+        "name": "Phi-4 Mini Reasoning",
+        "description": "Microsoft's reasoning-optimized model"
+      },
+      {
+        "id": "apollo-v0.1-4b-thinking-qx86x-hi-mlx",
+        "name": "Apollo 4B Thinking", 
+        "description": "Apollo's thinking model with MLX optimization"
+      },
+      {
+        "id": "ai21-jamba-reasoning-3b-hi-mlx",
+        "name": "AI21 Jamba Reasoning",
+        "description": "AI21's Jamba reasoning model"
+      }
+    ],
+    "chairman": {
+      "id": "qwen/qwen3-4b-thinking-2507",
+      "name": "Qwen3-4B Thinking",
+      "description": "Qwen's 4B thinking model for synthesis"
+    }
+  },
+  "deliberation": {
+    "rounds": 2,
+    "max_rounds": 5,
+    "enable_cross_review": true,
+    "refinement_prompt_template": "default"
+  },
+  "title_generation": {
+    "enabled": true,
+    "max_concurrent": 2,
+    "timeout_seconds": 60,
+    "retry_attempts": 3,
+    "thinking_models": ["thinking", "reasoning", "o1"],
+    "auto_expand_thinking": true
+  }
+}
 ```
+
+**Deliberation Settings:**
+- `rounds`: Number of deliberation rounds (1-5, default: 2 for multi-round)
+- `max_rounds`: Maximum allowed rounds 
+- `enable_cross_review`: Enable response refinement based on peer feedback
+- `refinement_prompt_template`: Template for refinement prompts
+
+**Title Generation Settings:**
+- `enabled`: Enable/disable background title generation (default: true)
+- `max_concurrent`: Maximum concurrent title generations (default: 2)
+- `timeout_seconds`: Timeout per title generation (default: 60)
+- `retry_attempts`: Number of retry attempts for failed generations (default: 3)
+- `thinking_models`: Keywords to identify thinking models (default: ["thinking", "reasoning", "o1"])
+- `auto_expand_thinking`: Auto-expand thinking sections in UI (default: true)
+
+### 3.1. Model Validation & Connectivity
+
+The application automatically validates your LLM server setup on startup:
+
+**Automatic Validation:**
+- **IP Detection**: Auto-detects your local IP address for LM Studio connection
+- **Connectivity Test**: Verifies connection to LM Studio server
+- **Model Verification**: Ensures all configured models are loaded and available
+- **Fallback Support**: Tries localhost (127.0.0.1) if auto-detected IP fails
+
+**Error Handling:**
+- **Clear Messages**: Detailed error descriptions for troubleshooting
+- **Graceful Failure**: App won't start with invalid configuration
+- **Troubleshooting Tips**: Helpful guidance for common setup issues
+
+### 3.2. Immediate Title Generation
+
+The system includes real-time title generation for active conversations:
+
+**Instant Processing:**
+- **Automatic Trigger**: When you submit the first message to a new conversation
+- **Priority Queue**: Immediate processing bypassing background queue for active users
+- **Real-time Updates**: Live title updates via WebSocket connection without page refresh
+- **Visual Feedback**: Progress indicators (⏳ "Generating title...") with smooth animations
+
+**User Experience:**
+- **Immediate Response**: Title generation starts within 500ms of message submission
+- **Parallel Processing**: Runs alongside council deliberation without adding delays
+- **Live Progress**: Watch titles evolve from "Conversation abc12345" to meaningful descriptions
+- **Thinking Display**: For reasoning models, see expandable thinking processes
+
+**Fallback System:**
+- **Error Recovery**: Graceful degradation to background processing if immediate fails
+- **100% Coverage**: All conversations eventually get meaningful titles
+- **Configuration**: Can be enabled/disabled via `title_generation.immediate_enabled` setting
+
+You can edit `config.json` to customize the council lineup and deliberation behavior without changing code. The backend will automatically load the new configuration on restart.
+
+**Validation**: Run `uv run python validate_models.py` to validate your configuration.
+
+### 4. Conversation Management
+
+The application includes a sophisticated conversation management system:
+
+**Recycle Bin System:**
+- **Safe Deletion**: Click the ✖️ icon next to any conversation to move it to the recycle bin
+- **Visual Feedback**: Delete button changes from grey ✖️ to red ❌ on hover for clear action indication
+- **Recovery Options**: Access deleted conversations via the 🗑️ Recycle Bin in the sidebar
+- **Restore Functionality**: Use the ⟲ button to restore conversations from the recycle bin
+- **Count Display**: Recycle bin shows the number of deleted conversations with a bold counter
+- **Dual View Mode**: Switch between active conversations and recycle bin with a green ← back arrow
+
+**Features:**
+- **Soft Delete**: Conversations are safely moved to recycle bin rather than permanently deleted
+- **Active Selection Management**: If you delete the currently active conversation, the view automatically clears
+- **Automatic Refresh**: Conversation lists update automatically when items are deleted or restored
+- **Clean Interface**: Deleted conversations don't clutter the main conversation list
+
+### 5. Smart Conversation Management
+
+The application includes intelligent conversation labeling and interface management:
+
+**ID-Based Labeling:**
+- **Unique Identification**: Conversations automatically labeled "Conversation [8-char-id]" format
+- **Clear Distinction**: Easy to identify and navigate between different conversations
+- **Automatic Migration**: Existing conversations updated from generic "New Conversation"
+- **Future Compatible**: Title service can override with meaningful titles
+
+**Smart Button States:**
+- **Intelligent Enabling**: New Conversation button disabled when current conversation is empty
+- **Visual Feedback**: Button turns grey (#cccccc) when disabled to prevent confusion
+- **Interaction Prevention**: No hover effects or click handling when inappropriate
+- **State Synchronization**: Updates automatically based on conversation content
+
+**User Experience Benefits:**
+- **Reduced Clutter**: Prevents creation of multiple empty conversations
+- **Clear Navigation**: Easy identification of conversations through unique IDs
+- **Intuitive Interface**: Button behavior matches user expectations and workflow
 
 ## Running the Application
+
+The application includes automatic model validation and connectivity testing on startup.
 
 **Option 1: Use the start script**
 ```bash
 ./start.sh
 ```
+
+**What happens on startup:**
+1. **Connectivity Test**: Auto-detects your local IP and tests connection to LM Studio
+2. **Model Validation**: Verifies all configured models are loaded and available
+3. **Error Prevention**: Won't start if models are missing or server unreachable
+4. **Clear Feedback**: Detailed status messages and troubleshooting guidance
+
+**Troubleshooting startup issues:**
+- Ensure LM Studio is running with server enabled
+- Verify all required models are loaded in LM Studio
+- Check that model IDs in config.json match exactly (case-sensitive)
+- Confirm network connectivity between application and LM Studio
 
 **Option 2: Run manually**
 
@@ -81,7 +251,8 @@ Then open http://localhost:5173 in your browser.
 
 ## Tech Stack
 
-- **Backend:** FastAPI (Python 3.10+), async httpx, OpenRouter API
+- **Backend:** FastAPI (Python 3.10+), async httpx, LM Studio API, multi-round deliberation, background title generation, conversation management, dynamic configuration
 - **Frontend:** React + Vite, react-markdown for rendering
 - **Storage:** JSON files in `data/conversations/`
 - **Package Management:** uv for Python, npm for JavaScript
+- **AI Infrastructure:** LM Studio for local model hosting

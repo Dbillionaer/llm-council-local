@@ -1,3 +1,22 @@
+<!-- OPENSPEC:START -->
+# OpenSpec Instructions
+
+These instructions are for AI assistants working in this project.
+
+Always open `@/openspec/AGENTS.md` when the request:
+- Mentions planning or proposals (words like proposal, spec, change, plan)
+- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
+- Sounds ambiguous and you need the authoritative spec before coding
+
+Use `@/openspec/AGENTS.md` to learn:
+- How to create and apply change proposals
+- Spec format and conventions
+- Project structure and guidelines
+
+Keep this managed block so 'openspec update' can refresh the instructions.
+
+<!-- OPENSPEC:END -->
+
 # CLAUDE.md - Technical Notes for LLM Council
 
 This file contains technical details, architectural decisions, and important implementation notes for future development sessions.
@@ -11,16 +30,17 @@ LLM Council is a 3-stage deliberation system where multiple LLMs collaboratively
 ### Backend Structure (`backend/`)
 
 **`config.py`**
-- Contains `COUNCIL_MODELS` (list of OpenRouter model identifiers)
+- Contains `COUNCIL_MODELS` (list of LM Studio model identifiers)
 - Contains `CHAIRMAN_MODEL` (model that synthesizes final answer)
-- Uses environment variable `OPENROUTER_API_KEY` from `.env`
+- Uses optional environment variable `LM_STUDIO_BASE_URL` from `.env` (defaults to `http://192.168.1.111:11434`)
 - Backend runs on **port 8001** (NOT 8000 - user had another app on 8000)
 
-**`openrouter.py`**
-- `query_model()`: Single async model query
+**`lmstudio.py`** (formerly `openrouter.py`)
+- `query_model()`: Single async model query to LM Studio
 - `query_models_parallel()`: Parallel queries using `asyncio.gather()`
 - Returns dict with 'content' and optional 'reasoning_details'
 - Graceful degradation: returns None on failure, continues with successful responses
+- No authentication required (local network API)
 
 **`council.py`** - The Core Logic
 - `stage1_collect_responses()`: Parallel queries to all council models
@@ -123,14 +143,19 @@ All backend modules use relative imports (e.g., `from .config import ...`) not a
 All ReactMarkdown components must be wrapped in `<div className="markdown-content">` for proper spacing. This class is defined globally in `index.css`.
 
 ### Model Configuration
-Models are hardcoded in `backend/config.py`. Chairman can be same or different from council members. The current default is Gemini as chairman per user preference.
+Models are now configured via `models.json` file instead of hardcoded values in `backend/config.py`. Current models are local via LM Studio:
+- Council: Phi-4 Mini Reasoning, Apollo 4B Thinking, AI21 Jamba Reasoning
+- Chairman: Qwen3-4B Thinking
+- Configuration supports runtime changes without code modifications
 
 ## Common Gotchas
 
 1. **Module Import Errors**: Always run backend as `python -m backend.main` from project root, not from backend directory
 2. **CORS Issues**: Frontend must match allowed origins in `main.py` CORS middleware
-3. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
-4. **Missing Metadata**: Metadata is ephemeral (not persisted), only available in API responses
+3. **LM Studio Connection**: Ensure LM Studio server is running and all models are loaded before starting
+4. **Local Network**: Backend requires network access to LM Studio server at configured IP
+5. **Ranking Parse Failures**: If models don't follow format, fallback regex extracts any "Response X" patterns in order
+6. **Missing Metadata**: Metadata is ephemeral (not persisted), only available in API responses
 
 ## Future Enhancement Ideas
 
@@ -143,24 +168,31 @@ Models are hardcoded in `backend/config.py`. Chairman can be same or different f
 
 ## Testing Notes
 
-Use `test_openrouter.py` to verify API connectivity and test different model identifiers before adding to council. The script tests both streaming and non-streaming modes.
+Test LM Studio connectivity with a simple Python script:
+```python
+import asyncio
+from backend.lmstudio import query_model
+response = await query_model('microsoft/phi-4-mini-reasoning', [{'role': 'user', 'content': 'test'}])
+```
+
+Ensure all models are loaded in LM Studio before testing council functionality.
 
 ## Data Flow Summary
 
 ```
 User Query
     ↓
-Stage 1: Parallel queries → [individual responses]
+Stage 1: Parallel queries to LM Studio models → [individual responses]
     ↓
 Stage 2: Anonymize → Parallel ranking queries → [evaluations + parsed rankings]
     ↓
 Aggregate Rankings Calculation → [sorted by avg position]
     ↓
-Stage 3: Chairman synthesis with full context
+Stage 3: Chairman synthesis via LM Studio with full context
     ↓
 Return: {stage1, stage2, stage3, metadata}
     ↓
 Frontend: Display with tabs + validation UI
 ```
 
-The entire flow is async/parallel where possible to minimize latency.
+All API calls go to local LM Studio server. The entire flow is async/parallel where possible to minimize latency.

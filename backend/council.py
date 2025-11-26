@@ -1,8 +1,9 @@
-"""3-stage LLM Council orchestration."""
+"""3-stage LLM Council orchestration with multi-round deliberation."""
 
 from typing import List, Dict, Any, Tuple
-from .openrouter import query_models_parallel, query_model
+from .lmstudio import query_models_parallel, query_model
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL
+from .config_loader import get_deliberation_rounds, get_deliberation_config
 
 
 async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
@@ -32,36 +33,78 @@ async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
     return stage1_results
 
 
-async def stage2_collect_rankings(
+async def stage2_multi_round_deliberation(
     user_query: str,
     stage1_results: List[Dict[str, Any]]
-) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+) -> Tuple[List[List[Dict[str, Any]]], Dict[str, str]]:
     """
-    Stage 2: Each model ranks the anonymized responses.
+    Stage 2: Multi-round deliberation with response refinement.
 
     Args:
         user_query: The original user query
         stage1_results: Results from Stage 1
 
     Returns:
-        Tuple of (rankings list, label_to_model mapping)
+        Tuple of (list of rankings per round, label_to_model mapping)
     """
-    # Create anonymized labels for responses (Response A, Response B, etc.)
+    deliberation_config = get_deliberation_config()
+    rounds = deliberation_config.get("rounds", 1)
+    enable_cross_review = deliberation_config.get("enable_cross_review", True)
+    
+    # Create initial anonymized labels for responses
     labels = [chr(65 + i) for i in range(len(stage1_results))]  # A, B, C, ...
-
-    # Create mapping from label to model name
     label_to_model = {
         f"Response {label}": result['model']
         for label, result in zip(labels, stage1_results)
     }
+    
+    all_rounds_rankings = []
+    current_responses = stage1_results.copy()  # Track evolving responses
+    
+    for round_num in range(1, rounds + 1):
+        print(f"Running deliberation round {round_num}/{rounds}")
+        
+        if round_num == 1:
+            # First round: standard ranking
+            round_rankings = await stage2_single_round_ranking(
+                user_query, current_responses, labels, round_num
+            )
+        else:
+            # Subsequent rounds: refinement + ranking
+            if enable_cross_review:
+                # First refine responses based on previous rounds
+                current_responses = await refine_responses_round(
+                    user_query, current_responses, all_rounds_rankings[-1], round_num
+                )
+            
+            # Then rank the (potentially refined) responses
+            round_rankings = await stage2_single_round_ranking(
+                user_query, current_responses, labels, round_num, all_rounds_rankings[-1]
+            )
+        
+        all_rounds_rankings.append(round_rankings)
+    
+    return all_rounds_rankings, label_to_model
 
+
+async def stage2_single_round_ranking(
+    user_query: str,
+    responses: List[Dict[str, Any]],
+    labels: List[str],
+    round_num: int,
+    previous_rankings: List[Dict[str, Any]] = None
+) -> List[Dict[str, Any]]:
+    """Single round of ranking with optional context from previous rounds."""
+    
     # Build the ranking prompt
     responses_text = "\n\n".join([
         f"Response {label}:\n{result['response']}"
-        for label, result in zip(labels, stage1_results)
+        for label, result in zip(labels, responses)
     ])
-
-    ranking_prompt = f"""You are evaluating different responses to the following question:
+    
+    if round_num == 1:
+        # First round: standard ranking prompt
+        ranking_prompt = f"""You are evaluating different responses to the following question:
 
 Question: {user_query}
 
@@ -91,25 +134,154 @@ FINAL RANKING:
 3. Response B
 
 Now provide your evaluation and ranking:"""
+    
+    else:
+        # Subsequent rounds: include context from previous rankings
+        previous_rankings_text = "\n\n".join([
+            f"Previous ranking by {ranking['model']}:\n{ranking['ranking'][:500]}..." 
+            if len(ranking['ranking']) > 500 
+            else f"Previous ranking by {ranking['model']}:\n{ranking['ranking']}"
+            for ranking in previous_rankings
+        ])
+        
+        ranking_prompt = f"""You are evaluating different responses to the following question (Round {round_num}):
+
+Question: {user_query}
+
+Here are the responses from different models (anonymized):
+
+{responses_text}
+
+Previous rankings from Round {round_num - 1}:
+{previous_rankings_text}
+
+Your task:
+1. Consider how the responses may have been refined based on previous feedback
+2. Evaluate each current response individually
+3. Take into account the previous round's insights and rankings
+4. Provide your updated ranking at the end
+
+IMPORTANT: Your final ranking MUST be formatted EXACTLY as follows:
+- Start with the line "FINAL RANKING:" (all caps, with colon)
+- Then list the responses from best to worst as a numbered list
+- Each line should be: number, period, space, then ONLY the response label (e.g., "1. Response A")
+
+Now provide your evaluation and ranking for Round {round_num}:"""
 
     messages = [{"role": "user", "content": ranking_prompt}]
 
     # Get rankings from all council models in parallel
-    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+    responses_dict = await query_models_parallel(COUNCIL_MODELS, messages)
 
     # Format results
-    stage2_results = []
-    for model, response in responses.items():
+    round_results = []
+    for model, response in responses_dict.items():
         if response is not None:
             full_text = response.get('content', '')
             parsed = parse_ranking_from_text(full_text)
-            stage2_results.append({
+            round_results.append({
                 "model": model,
                 "ranking": full_text,
-                "parsed_ranking": parsed
+                "parsed_ranking": parsed,
+                "round": round_num
             })
 
-    return stage2_results, label_to_model
+    return round_results
+
+
+async def refine_responses_round(
+    user_query: str,
+    current_responses: List[Dict[str, Any]],
+    previous_rankings: List[Dict[str, Any]],
+    round_num: int
+) -> List[Dict[str, Any]]:
+    """Refine responses based on feedback from previous round."""
+    
+    # Create summary of feedback for each response
+    feedback_summary = {}
+    labels = [chr(65 + i) for i in range(len(current_responses))]
+    
+    for i, label in enumerate(labels):
+        response_label = f"Response {label}"
+        feedback_items = []
+        
+        # Collect feedback from all rankings mentioning this response
+        for ranking in previous_rankings:
+            ranking_text = ranking['ranking'].lower()
+            if response_label.lower() in ranking_text:
+                # Extract relevant feedback (simplified approach)
+                lines = ranking_text.split('\n')
+                for line in lines:
+                    if response_label.lower() in line and len(line) > 20:
+                        feedback_items.append(f"- {ranking['model']}: {line.strip()}")
+        
+        feedback_summary[response_label] = "\n".join(feedback_items) if feedback_items else "No specific feedback"
+    
+    # Refine each response
+    refined_responses = []
+    for i, (response_data, label) in enumerate(zip(current_responses, labels)):
+        response_label = f"Response {label}"
+        model = response_data['model']
+        original_response = response_data['response']
+        feedback = feedback_summary.get(response_label, "")
+        
+        refinement_prompt = f"""You previously provided this response to the question: "{user_query}"
+
+Your original response:
+{original_response}
+
+Feedback from other models in the council:
+{feedback}
+
+Based on this feedback, please refine your response. You may:
+- Address any weaknesses mentioned in the feedback
+- Build upon insights from other responses
+- Maintain what was working well in your original response
+- Improve clarity, accuracy, or completeness
+
+Provide your refined response:"""
+
+        messages = [{"role": "user", "content": refinement_prompt}]
+        
+        # Query the same model that provided the original response
+        refined_response = await query_model(model, messages)
+        
+        if refined_response and refined_response.get('content'):
+            refined_responses.append({
+                "model": model,
+                "response": refined_response['content'],
+                "original_response": original_response,
+                "round": round_num
+            })
+        else:
+            # If refinement fails, keep original
+            refined_responses.append({
+                "model": model,
+                "response": original_response,
+                "original_response": original_response,
+                "round": round_num,
+                "refinement_failed": True
+            })
+    
+    return refined_responses
+
+
+# Backward compatibility wrapper
+async def stage2_collect_rankings(
+    user_query: str,
+    stage1_results: List[Dict[str, Any]]
+) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    """
+    Backward compatibility wrapper for stage2 functionality.
+    Returns the final round's rankings in the old format.
+    """
+    all_rounds_rankings, label_to_model = await stage2_multi_round_deliberation(
+        user_query, stage1_results
+    )
+    
+    # Return the final round's rankings
+    final_round_rankings = all_rounds_rankings[-1] if all_rounds_rankings else []
+    return final_round_rankings, label_to_model
 
 
 async def stage3_synthesize_final(
@@ -158,8 +330,8 @@ Provide a clear, well-reasoned final answer that represents the council's collec
 
     messages = [{"role": "user", "content": chairman_prompt}]
 
-    # Query the chairman model
-    response = await query_model(CHAIRMAN_MODEL, messages)
+    # Query the chairman model with extended timeout for complex synthesis
+    response = await query_model(CHAIRMAN_MODEL, messages, timeout=180.0)
 
     if response is None:
         # Fallback if chairman fails
@@ -274,8 +446,8 @@ Title:"""
 
     messages = [{"role": "user", "content": title_prompt}]
 
-    # Use gemini-2.5-flash for title generation (fast and cheap)
-    response = await query_model("google/gemini-2.5-flash", messages, timeout=30.0)
+    # Use first available council model for title generation
+    response = await query_model(COUNCIL_MODELS[0], messages, timeout=30.0)
 
     if response is None:
         # Fallback to a generic title
@@ -295,7 +467,7 @@ Title:"""
 
 async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
     """
-    Run the complete 3-stage council process.
+    Run the complete 3-stage council process with multi-round deliberation.
 
     Args:
         user_query: The user's question
@@ -313,23 +485,114 @@ async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
             "response": "All models failed to respond. Please try again."
         }, {}
 
-    # Stage 2: Collect rankings
-    stage2_results, label_to_model = await stage2_collect_rankings(user_query, stage1_results)
+    # Stage 2: Multi-round deliberation
+    deliberation_config = get_deliberation_config()
+    rounds = deliberation_config.get("rounds", 1)
+    
+    if rounds > 1:
+        # Multi-round deliberation
+        all_rounds_rankings, label_to_model = await stage2_multi_round_deliberation(user_query, stage1_results)
+        
+        # For metadata, use final round rankings
+        final_round_rankings = all_rounds_rankings[-1] if all_rounds_rankings else []
+        aggregate_rankings = calculate_aggregate_rankings(final_round_rankings, label_to_model)
+        
+        # Enhanced metadata with round information
+        metadata = {
+            "deliberation": {
+                "rounds_completed": len(all_rounds_rankings),
+                "rounds_requested": rounds,
+                "label_to_model": label_to_model,
+                "aggregate_rankings": aggregate_rankings
+            }
+        }
+        
+        # Stage 3: Enhanced synthesis with multi-round context
+        stage3_result = await stage3_enhanced_synthesis(user_query, stage1_results, all_rounds_rankings)
+        
+        # Return enhanced format for multi-round
+        return stage1_results, all_rounds_rankings, stage3_result, metadata
+    
+    else:
+        # Single round (backward compatibility)
+        stage2_results, label_to_model = await stage2_collect_rankings(user_query, stage1_results)
+        
+        # Calculate aggregate rankings
+        aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
+        
+        # Stage 3: Final response
+        stage3_result = await stage3_synthesize_final(user_query, stage1_results, stage2_results)
+        
+        # Standard metadata
+        metadata = {
+            "label_to_model": label_to_model,
+            "aggregate_rankings": aggregate_rankings
+        }
+        
+        return stage1_results, stage2_results, stage3_result, metadata
 
-    # Calculate aggregate rankings
-    aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
 
-    # Stage 3: Synthesize final answer
-    stage3_result = await stage3_synthesize_final(
-        user_query,
-        stage1_results,
-        stage2_results
-    )
+async def stage3_enhanced_synthesis(
+    user_query: str,
+    stage1_results: List[Dict[str, Any]],
+    all_rounds_rankings: List[List[Dict[str, Any]]]
+) -> Dict[str, Any]:
+    """
+    Enhanced Stage 3 synthesis that considers multi-round deliberation.
+    """
+    # Build context from all rounds
+    rounds_context = []
+    for round_num, round_rankings in enumerate(all_rounds_rankings, 1):
+        round_text = f"Round {round_num} Rankings:\n"
+        round_text += "\n".join([
+            f"- {result['model']}: {result['ranking'][:300]}..." 
+            if len(result['ranking']) > 300 
+            else f"- {result['model']}: {result['ranking']}"
+            for result in round_rankings
+        ])
+        rounds_context.append(round_text)
+    
+    # Build comprehensive context for chairman
+    stage1_text = "\n\n".join([
+        f"Model: {result['model']}\nResponse: {result['response']}"
+        for result in stage1_results
+    ])
+    
+    all_rounds_text = "\n\n".join(rounds_context)
+    
+    chairman_prompt = f"""You are the Chairman of an LLM Council. Multiple AI models have provided responses to a user's question, then engaged in {len(all_rounds_rankings)} round(s) of deliberation, ranking and refining their responses.
 
-    # Prepare metadata
-    metadata = {
-        "label_to_model": label_to_model,
-        "aggregate_rankings": aggregate_rankings
+Original Question: {user_query}
+
+STAGE 1 - Initial Responses:
+{stage1_text}
+
+STAGE 2 - Multi-Round Deliberation:
+{all_rounds_text}
+
+Your task as Chairman is to synthesize all of this deliberative process into a single, comprehensive, accurate answer. Consider:
+- The evolution of responses across rounds
+- The consensus and disagreements revealed in the rankings
+- How responses were refined based on peer feedback
+- The final rankings and their implications
+- Any patterns of improvement or convergence
+
+Provide a clear, well-reasoned final answer that represents the council's collective wisdom through this deliberative process:"""
+
+    messages = [{"role": "user", "content": chairman_prompt}]
+
+    # Query the chairman model with extended timeout for complex synthesis
+    response = await query_model(CHAIRMAN_MODEL, messages, timeout=240.0)  # Extra time for multi-round
+
+    if response is None:
+        # Fallback if chairman fails
+        return {
+            "model": CHAIRMAN_MODEL,
+            "response": "Error: Unable to generate final synthesis from multi-round deliberation."
+        }
+
+    return {
+        "model": CHAIRMAN_MODEL,
+        "response": response.get('content', ''),
+        "synthesis_type": "multi_round_enhanced"
     }
-
-    return stage1_results, stage2_results, stage3_result, metadata

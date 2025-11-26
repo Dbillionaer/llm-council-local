@@ -1,0 +1,252 @@
+"""Dynamic configuration loader for LLM Council."""
+
+import json
+import os
+from typing import List, Dict, Any, Tuple
+from pathlib import Path
+
+# Default fallback configuration
+DEFAULT_COUNCIL_MODELS = [
+    "microsoft/phi-4-mini-reasoning",
+    "apollo-v0.1-4b-thinking-qx86x-hi-mlx",
+    "ai21-jamba-reasoning-3b-hi-mlx",
+]
+DEFAULT_CHAIRMAN_MODEL = "qwen/qwen3-4b-thinking-2507"
+DEFAULT_DELIBERATION_ROUNDS = 1
+
+def get_project_root() -> Path:
+    """Get the project root directory."""
+    current_file = Path(__file__)
+    # Go up from backend/config_loader.py to project root
+    return current_file.parent.parent
+
+def load_config() -> Dict[str, Any]:
+    """
+    Load configuration from config.json, with fallback to models.json.
+    
+    Returns:
+        Dict containing full configuration, or defaults if loading fails
+    """
+    project_root = get_project_root()
+    config_path = project_root / "config.json"
+    models_path = project_root / "models.json"  # Backward compatibility
+    
+    # Try config.json first
+    if config_path.exists():
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+            
+            # Validate and normalize configuration
+            normalized = normalize_config(config)
+            if normalized:
+                print(f"Loaded configuration from {config_path}")
+                return normalized
+            else:
+                print(f"Warning: Invalid configuration in {config_path}, using defaults")
+                return get_default_config()
+        
+        except json.JSONDecodeError as e:
+            print(f"Warning: Invalid JSON in {config_path}: {e}")
+        except Exception as e:
+            print(f"Warning: Error loading {config_path}: {e}")
+    
+    # Fallback to models.json for backward compatibility
+    elif models_path.exists():
+        try:
+            with open(models_path, 'r', encoding='utf-8') as f:
+                old_config = json.load(f)
+            
+            # Convert old models.json format to new config.json format
+            if validate_old_config(old_config):
+                converted = convert_old_config(old_config)
+                print(f"Loaded legacy configuration from {models_path}")
+                print("Consider migrating to config.json format")
+                return converted
+            else:
+                print(f"Warning: Invalid legacy configuration in {models_path}")
+        
+        except json.JSONDecodeError as e:
+            print(f"Warning: Invalid JSON in {models_path}: {e}")
+        except Exception as e:
+            print(f"Warning: Error loading {models_path}: {e}")
+    
+    # Final fallback to defaults
+    print(f"Warning: No configuration file found, using defaults")
+    return get_default_config()
+
+def normalize_config(config: Dict[str, Any]) -> Dict[str, Any] | None:
+    """
+    Normalize and validate configuration structure.
+    
+    Args:
+        config: Raw configuration dictionary
+    
+    Returns:
+        Normalized configuration or None if invalid
+    """
+    if not isinstance(config, dict):
+        return None
+    
+    # Handle both new format (models: {...}) and mixed format
+    if "models" in config:
+        # New format - validate structure
+        if not validate_new_config(config):
+            return None
+        return config
+    
+    elif "council" in config and "chairman" in config:
+        # Old format found in config.json - convert it
+        if validate_old_config(config):
+            return convert_old_config(config)
+        return None
+    
+    return None
+
+def validate_new_config(config: Dict[str, Any]) -> bool:
+    """Validate new config.json format."""
+    if "models" not in config:
+        return False
+    
+    models = config["models"]
+    if not isinstance(models, dict):
+        return False
+    
+    # Validate models section using old validation logic
+    return validate_old_config(models)
+
+def validate_old_config(config: Dict[str, Any]) -> bool:
+    """Validate models.json format (backward compatibility)."""
+    if not isinstance(config, dict):
+        return False
+    
+    if "council" not in config or "chairman" not in config:
+        return False
+    
+    # Validate council models
+    council = config["council"]
+    if not isinstance(council, list) or len(council) == 0:
+        return False
+    
+    for model in council:
+        if not isinstance(model, dict) or "id" not in model or "name" not in model:
+            return False
+        if not isinstance(model["id"], str) or not isinstance(model["name"], str):
+            return False
+    
+    # Validate chairman model
+    chairman = config["chairman"]
+    if not isinstance(chairman, dict):
+        return False
+    if "id" not in chairman or "name" not in chairman:
+        return False
+    if not isinstance(chairman["id"], str) or not isinstance(chairman["name"], str):
+        return False
+    
+    return True
+
+def convert_old_config(old_config: Dict[str, Any]) -> Dict[str, Any]:
+    """Convert models.json format to new config.json format."""
+    return {
+        "models": {
+            "council": old_config["council"],
+            "chairman": old_config["chairman"]
+        },
+        "deliberation": {
+            "rounds": 1,  # Default to single round for backward compatibility
+            "max_rounds": 5,
+            "enable_cross_review": True,
+            "refinement_prompt_template": "default"
+        },
+        "metadata": old_config.get("metadata", {
+            "version": "1.0-converted",
+            "source": "converted_from_models_json"
+        })
+    }
+
+def get_default_config() -> Dict[str, Any]:
+    """Get default fallback configuration."""
+    return {
+        "models": {
+            "council": [
+                {"id": model, "name": model.split("/")[-1]} 
+                for model in DEFAULT_COUNCIL_MODELS
+            ],
+            "chairman": {
+                "id": DEFAULT_CHAIRMAN_MODEL,
+                "name": DEFAULT_CHAIRMAN_MODEL.split("/")[-1]
+            }
+        },
+        "deliberation": {
+            "rounds": DEFAULT_DELIBERATION_ROUNDS,
+            "max_rounds": 5,
+            "enable_cross_review": True,
+            "refinement_prompt_template": "default"
+        },
+        "metadata": {
+            "version": "fallback",
+            "source": "hardcoded_defaults"
+        }
+    }
+
+def get_council_models() -> List[str]:
+    """Get list of council model IDs."""
+    config = load_config()
+    return [model["id"] for model in config["models"]["council"]]
+
+def get_chairman_model() -> str:
+    """Get chairman model ID."""
+    config = load_config()
+    return config["models"]["chairman"]["id"]
+
+def get_deliberation_config() -> Dict[str, Any]:
+    """Get deliberation configuration."""
+    config = load_config()
+    return config.get("deliberation", {
+        "rounds": DEFAULT_DELIBERATION_ROUNDS,
+        "max_rounds": 5,
+        "enable_cross_review": True,
+        "refinement_prompt_template": "default"
+    })
+
+def get_deliberation_rounds() -> int:
+    """Get number of deliberation rounds."""
+    deliberation = get_deliberation_config()
+    return deliberation.get("rounds", DEFAULT_DELIBERATION_ROUNDS)
+
+def get_title_generation_config() -> Dict[str, Any]:
+    """Get title generation configuration."""
+    config = load_config()
+    return config.get("title_generation", {
+        "enabled": True,
+        "max_concurrent": 2,
+        "timeout_seconds": 60,
+        "retry_attempts": 3,
+        "thinking_models": ["thinking", "reasoning", "o1"],
+        "auto_expand_thinking": True
+    })
+
+def get_model_info(model_id: str) -> Dict[str, str]:
+    """Get detailed information about a specific model."""
+    config = load_config()
+    models = config["models"]
+    
+    # Check council models
+    for model in models["council"]:
+        if model["id"] == model_id:
+            return model
+    
+    # Check chairman model
+    if models["chairman"]["id"] == model_id:
+        return models["chairman"]
+    
+    return {}
+
+def list_all_models() -> Dict[str, List[Dict[str, str]]]:
+    """Get all configured models organized by role."""
+    config = load_config()
+    models = config["models"]
+    return {
+        "council": models["council"],
+        "chairman": [models["chairman"]]  # Wrap in list for consistency
+    }

@@ -1,0 +1,49 @@
+{
+  "server": {
+    "ip": "",
+    "port": "11434",
+    "base_url_template": "http://{ip}:{port}/v1"
+  },
+  "models": {
+    "council": [
+      {
+        "id": "microsoft/phi-4-mini-reasoning",
+        "name": "Phi-4 Mini Reasoning",
+        "description": "Microsoft's reasoning-optimized model"
+      },
+      {
+        "id": "apollo-v0.1-4b-thinking-qx86x-hi-mlx",
+        "name": "Apollo 4B Thinking",
+        "description": "Apollo's thinking model with MLX optimization"
+      },
+      {
+        "id": "ai21-jamba-reasoning-3b-hi-mlx",
+        "name": "AI21 Jamba Reasoning",
+        "description": "AI21's Jamba reasoning model"
+      }
+    ],
+    "chairman": {
+      "id": "qwen/qwen3-4b-thinking-2507",
+      "name": "Qwen3-4B Thinking",
+      "description": "Qwen's 4B thinking model for synthesis"
+    }
+  },
+  "deliberation": {
+    "rounds": 2,
+    "max_rounds": 5,
+    "enable_cross_review": true,
+    "refinement_prompt_template": "default"
+  },
+  "title_generation": {
+    "enabled": true,
+    "max_concurrent": 2,
+    "timeout_seconds": 60,
+    "retry_attempts": 3,
+    "thinking_models": ["thinking", "reasoning", "o1"],
+    "auto_expand_thinking": true
+  },
+  "metadata": {
+    "version": "2.1",
+    "updated": "2025-11-26T08:18:17.110Z"
+  }
+}

@@ -1,18 +1,73 @@
-"""FastAPI backend for LLM Council."""
+"""FastAPI backend for LLM Council with background title generation."""
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any
+from contextlib import asynccontextmanager
 import uuid
 import json
 import asyncio
+import time
+import sys
 
 from . import storage
-from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
+from .council import run_full_council, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
+from .title_service import initialize_title_service, shutdown_title_service, get_title_service
+from .model_validator import validate_models
+from .config_loader import load_config
+from .config import set_api_endpoints
 
-app = FastAPI(title="LLM Council API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage app lifespan events."""
+    # Startup
+    print("🚀 Starting LLM Council API...")
+    
+    # Validate models and connectivity
+    print("🔍 Validating models and server connectivity...")
+    try:
+        config = load_config()
+        success, message, base_url = validate_models(config)
+        
+        if not success:
+            print(f"❌ Model validation failed: {message}")
+            print("🛑 Please check your LLM server and model configuration.")
+            print("💡 Troubleshooting:")
+            print("   - Ensure LM Studio is running")
+            print("   - Check if models are loaded in LM Studio")
+            print("   - Verify network connectivity")
+            print("   - Check config.json model IDs match available models")
+            sys.exit(1)
+        
+        # Set API endpoints with validated URL
+        set_api_endpoints(base_url)
+        print(f"✅ Model validation successful: {message}")
+        print(f"🌐 Using LLM server at: {base_url}")
+        
+    except Exception as e:
+        print(f"❌ Error during model validation: {e}")
+        print("🛑 Startup failed. Please check your configuration.")
+        sys.exit(1)
+    
+    try:
+        await initialize_title_service()
+        print("✅ Title generation service initialized")
+    except Exception as e:
+        print(f"❌ Error initializing title service: {e}")
+    
+    yield
+    
+    # Shutdown
+    print("🛑 Shutting down LLM Council API...")
+    try:
+        await shutdown_title_service()
+        print("✅ Services cleaned up")
+    except Exception as e:
+        print(f"❌ Error during shutdown: {e}")
+
+app = FastAPI(title="LLM Council API", lifespan=lifespan)
 
 # Enable CORS for local development
 app.add_middleware(
@@ -58,16 +113,50 @@ async def root():
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])
 async def list_conversations():
-    """List all conversations (metadata only)."""
-    return storage.list_conversations()
+    """List all active conversations (metadata only, excluding deleted)."""
+    all_conversations = storage.list_conversations()
+    # Filter out deleted conversations
+    active_conversations = [
+        conv for conv in all_conversations 
+        if not conv.get("deleted", False)
+    ]
+    return active_conversations
 
 
 @app.post("/api/conversations", response_model=Conversation)
 async def create_conversation(request: CreateConversationRequest):
-    """Create a new conversation."""
-    conversation_id = str(uuid.uuid4())
-    conversation = storage.create_conversation(conversation_id)
+    """Create a new conversation with ID-based title."""
+    conversation = storage.create_conversation_with_id_title()
+    
+    # Queue for title generation
+    title_service = get_title_service()
+    await title_service.queue_title_generation(conversation["id"], priority=0)
+    
     return conversation
+
+
+@app.post("/api/conversations/migrate-titles")
+async def migrate_conversation_titles():
+    """Migrate existing conversations to ID-based titles."""
+    try:
+        count = storage.migrate_conversation_titles()
+        return {"success": True, "migrated_count": count, "message": f"Migrated {count} conversations"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/conversations/deleted")
+async def list_deleted_conversations():
+    """List all deleted conversations."""
+    try:
+        all_conversations = storage.list_conversations()
+        deleted_conversations = [
+            conv for conv in all_conversations 
+            if conv.get("deleted", False)
+        ]
+        return deleted_conversations
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/api/conversations/{conversation_id}", response_model=Conversation)
@@ -90,16 +179,17 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    # Check if this is the first message
+    # Check if this is the first message and conversation has generic title
     is_first_message = len(conversation["messages"]) == 0
-
+    current_title = conversation.get("title", "").strip()
+    
     # Add user message
     storage.add_user_message(conversation_id, request.content)
 
-    # If this is the first message, generate a title
-    if is_first_message:
-        title = await generate_conversation_title(request.content)
-        storage.update_conversation_title(conversation_id, title)
+    # If this is the first message and has generic title, trigger immediate title generation
+    if is_first_message and current_title.startswith("Conversation "):
+        title_service = get_title_service()
+        await title_service.generate_title_immediate(conversation_id, request.content)
 
     # Run the 3-stage council process
     stage1_results, stage2_results, stage3_result, metadata = await run_full_council(
@@ -134,18 +224,20 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    # Check if this is the first message
+    # Check if this is the first message and conversation has generic title
     is_first_message = len(conversation["messages"]) == 0
+    current_title = conversation.get("title", "").strip()
 
     async def event_generator():
         try:
             # Add user message
             storage.add_user_message(conversation_id, request.content)
 
-            # Start title generation in parallel (don't await yet)
-            title_task = None
-            if is_first_message:
-                title_task = asyncio.create_task(generate_conversation_title(request.content))
+            # Start immediate title generation if needed (non-blocking)
+            if is_first_message and current_title.startswith("Conversation "):
+                title_service = get_title_service()
+                await title_service.generate_title_immediate(conversation_id, request.content)
+                yield f"data: {json.dumps({'type': 'title_generation_started'})}\n\n"
 
             # Stage 1: Collect responses
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
@@ -162,12 +254,6 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
             stage3_result = await stage3_synthesize_final(request.content, stage1_results, stage2_results)
             yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
-
-            # Wait for title generation if it was started
-            if title_task:
-                title = await title_task
-                storage.update_conversation_title(conversation_id, title)
-                yield f"data: {json.dumps({'type': 'title_complete', 'data': {'title': title}})}\n\n"
 
             # Save complete assistant message
             storage.add_assistant_message(
@@ -194,6 +280,134 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
     )
 
 
+@app.get("/api/title-queue/status")
+async def get_title_queue_status():
+    """Get current title generation queue status."""
+    title_service = get_title_service()
+    return title_service.get_queue_status()
+
+
+@app.post("/api/conversations/{conversation_id}/generate-title")
+async def trigger_title_generation(conversation_id: str):
+    """Manually trigger title generation for a conversation."""
+    title_service = get_title_service()
+    success = await title_service.queue_title_generation(conversation_id, priority=10)  # High priority
+    return {"success": success, "message": "Title generation queued" if success else "Already in progress or not needed"}
+
+
+@app.get("/api/conversations/{conversation_id}/title-status")
+async def get_conversation_title_status(conversation_id: str):
+    """Get title generation status for a conversation."""
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    return {
+        "conversation_id": conversation_id,
+        "title": conversation.get("title", ""),
+        "title_status": conversation.get("title_status", "pending"),
+        "title_generation_status": conversation.get("title_generation_status", {}),
+        "title_generated_at": conversation.get("title_generated_at")
+    }
+
+
+@app.websocket("/ws/title-updates")
+async def websocket_title_updates(websocket: WebSocket):
+    """WebSocket endpoint for real-time title generation updates."""
+    await websocket.accept()
+    
+    # Register this WebSocket with the title service
+    title_service = get_title_service()
+    client_id = str(uuid.uuid4())
+    title_service.register_websocket(client_id, websocket)
+    
+    try:
+        # Keep the connection alive and handle any incoming messages
+        while True:
+            try:
+                # Wait for any messages (ping/pong, etc.)
+                message = await websocket.receive_text()
+                # Echo back for ping/pong
+                await websocket.send_text(f"pong: {message}")
+            except WebSocketDisconnect:
+                break
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+    finally:
+        # Unregister when connection closes
+        title_service.unregister_websocket(client_id)
+    conversation = storage.get_conversation(conversation_id)
+    if conversation is None:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    return {
+        "conversation_id": conversation_id,
+        "title": conversation.get("title", ""),
+        "title_status": conversation.get("title_status", "pending"),
+        "title_generation_status": conversation.get("title_generation_status", {}),
+        "title_generated_at": conversation.get("title_generated_at")
+    }
+
+
+
 if __name__ == "__main__":
     import uvicorn
+    
+    # When running directly, we need to handle the lifespan manually
+    # The uvicorn command will handle it properly automatically
+    print("⚠️  Warning: Running backend directly. For full functionality, use:")
+    print("   uvicorn backend.main:app --host 0.0.0.0 --port 8001")
+    print("   or run: ./start.sh")
+    print()
+    
     uvicorn.run(app, host="0.0.0.0", port=8001)
+
+
+@app.patch("/api/conversations/{conversation_id}/delete")
+async def soft_delete_conversation(conversation_id: str):
+    """Soft delete a conversation (move to recycle bin)."""
+    try:
+        conversation = storage.get_conversation(conversation_id)
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        # Mark as deleted
+        conversation["deleted"] = True
+        conversation["deleted_at"] = time.time()
+        storage.update_conversation(conversation_id, conversation)
+        
+        return {"success": True, "message": "Conversation moved to recycle bin"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.patch("/api/conversations/{conversation_id}/restore")
+async def restore_conversation(conversation_id: str):
+    """Restore a conversation from recycle bin."""
+    try:
+        conversation = storage.get_conversation(conversation_id)
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        # Remove deleted flag
+        conversation["deleted"] = False
+        if "deleted_at" in conversation:
+            del conversation["deleted_at"]
+        storage.update_conversation(conversation_id, conversation)
+        
+        return {"success": True, "message": "Conversation restored"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/conversations/{conversation_id}/permanent")
+async def permanently_delete_conversation(conversation_id: str):
+    """Permanently delete a conversation (cannot be restored)."""
+    try:
+        success = storage.delete_conversation(conversation_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        return {"success": True, "message": "Conversation permanently deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

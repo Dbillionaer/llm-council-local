@@ -2,6 +2,8 @@
 
 import json
 import os
+import time
+import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from pathlib import Path
@@ -78,9 +80,31 @@ def save_conversation(conversation: Dict[str, Any]):
         json.dump(conversation, f, indent=2)
 
 
+def update_conversation(conversation_id: str, conversation: Dict[str, Any]):
+    """Update an existing conversation."""
+    ensure_data_dir()
+    conversation_path = get_conversation_path(conversation_id)
+    
+    with open(conversation_path, 'w') as f:
+        json.dump(conversation, f, indent=2, default=str)
+
+
+def delete_conversation(conversation_id: str) -> bool:
+    """Permanently delete a conversation file."""
+    try:
+        ensure_data_dir()
+        conversation_path = get_conversation_path(conversation_id)
+        if os.path.exists(conversation_path):
+            os.remove(conversation_path)
+            return True
+        return False
+    except Exception:
+        return False
+
+
 def list_conversations() -> List[Dict[str, Any]]:
     """
-    List all conversations (metadata only).
+    List all conversations (metadata only), including deleted status.
 
     Returns:
         List of conversation metadata dicts
@@ -93,18 +117,81 @@ def list_conversations() -> List[Dict[str, Any]]:
             path = os.path.join(DATA_DIR, filename)
             with open(path, 'r') as f:
                 data = json.load(f)
-                # Return metadata only
+                # Return metadata including deleted status and normalize timestamps
+                created_at = data["created_at"]
+                if isinstance(created_at, (int, float)):
+                    # Convert timestamp to ISO format string
+                    created_at = datetime.fromtimestamp(created_at).isoformat()
+                
                 conversations.append({
                     "id": data["id"],
-                    "created_at": data["created_at"],
+                    "created_at": created_at,
                     "title": data.get("title", "New Conversation"),
-                    "message_count": len(data["messages"])
+                    "message_count": len(data["messages"]),
+                    "deleted": data.get("deleted", False),
+                    "deleted_at": data.get("deleted_at")
                 })
 
-    # Sort by creation time, newest first
-    conversations.sort(key=lambda x: x["created_at"], reverse=True)
+    # Sort by creation time, newest first - handle mixed string/float timestamps
+    def get_sort_key(conv):
+        created_at = conv["created_at"]
+        if isinstance(created_at, str):
+            try:
+                # Try parsing ISO format
+                from datetime import datetime
+                return datetime.fromisoformat(created_at.replace('Z', '+00:00')).timestamp()
+            except:
+                return 0
+        elif isinstance(created_at, (int, float)):
+            return float(created_at)
+        else:
+            return 0
+    
+    conversations.sort(key=get_sort_key, reverse=True)
 
     return conversations
+
+
+def migrate_conversation_titles():
+    """Update existing conversations with ID-based titles."""
+    ensure_data_dir()
+    migrated_count = 0
+    
+    for filename in os.listdir(DATA_DIR):
+        if filename.endswith('.json'):
+            conversation_id = filename[:-5]  # Remove .json extension
+            conversation = get_conversation(conversation_id)
+            
+            if conversation and conversation.get('title') == 'New Conversation':
+                short_id = conversation_id[:8]
+                conversation['title'] = f'Conversation {short_id}'
+                update_conversation(conversation_id, conversation)
+                migrated_count += 1
+                print(f"Migrated conversation {conversation_id} to 'Conversation {short_id}'")
+    
+    print(f"Migration complete: {migrated_count} conversations updated")
+    return migrated_count
+
+
+def create_conversation_with_id_title():
+    """Create a new conversation with ID-based title."""
+    conversation_id = str(uuid.uuid4())
+    short_id = conversation_id[:8]
+    
+    conversation = {
+        "id": conversation_id,
+        "created_at": datetime.now().isoformat(),
+        "title": f"Conversation {short_id}",
+        "messages": [],
+        "title_status": "id_based",
+        "title_generation_status": {
+            "status": "pending",
+            "timestamp": time.time()
+        }
+    }
+    
+    save_conversation(conversation)
+    return conversation
 
 
 def add_user_message(conversation_id: str, content: str):
