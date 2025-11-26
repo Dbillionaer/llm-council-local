@@ -1,8 +1,4 @@
----
-
 **NOTE: Based on `https://github.com/karpathy/llm-council` but has been modified to access LLMs via OpenAI API base, with API key having been removed because focus is on local inference and doesn't require it.**
-
----
 
 # LLM Council
 
