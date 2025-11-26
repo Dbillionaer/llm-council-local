@@ -1,8 +1,16 @@
+---
+
+**NOTE: Based on `https://github.com/karpathy/llm-council` but has been modified to access LLMs via OpenAI API base, with API key having been removed because focus is on local inference and doesn't require it.**
+
+---
+
 # LLM Council
 
 ![llmcouncil](header.jpg)
 
-The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses LM Studio to send your query to multiple LLMs, it then asks them to review and rank each other's work across multiple deliberation rounds, and finally a Chairman LLM produces the final response.
+The idea of this repo is that instead of asking a question to your favorite LLM provider (e.g. OpenAI GPT 5.1, Google Gemini 3.0 Pro, Anthropic Claude Sonnet 4.5, xAI Grok 4, eg.c), you can group them into your "LLM Council". This repo is a simple, local web app that essentially looks like ChatGPT except it uses LM Studio (or Ollama, etc.) to send your query to multiple LLMs, it then asks them to review and rank each other's work across multiple deliberation rounds, and finally a Chairman LLM produces the final response.
+
+The UI and UX have been significantly improved with features like real-time streaming, conversation management, automatic title generation, and enhanced visual feedback.
 
 In a bit more detail, here is what happens when you submit a query:
 
@@ -20,6 +28,17 @@ In a bit more detail, here is what happens when you submit a query:
 - **Real-time Streaming**: Live progress updates during title generation and deliberation
 - **Dynamic Configuration**: Change models and settings without code modifications
 - **Local Privacy**: All processing happens locally via LM Studio - no data sent to external services
+
+## Planned Improvements
+
+- **Model Quality Rating & Voting**: Council members rate and vote on each other's responses to automatically select the best-performing models
+- **Auto-Model Selection**: Dynamic model selection based on historical performance ratings and task-specific capabilities
+- **Council Member Personalities**: Assign distinct personas and specializations to different council members for diverse perspectives
+- **Advanced Deliberation Strategies**: Implement debate formats, consensus building, and specialized review protocols
+- **Model Performance Analytics**: Track and analyze individual model performance across different types of queries
+- **Custom Prompt Templates**: Allow users to define specialized prompts for different types of discussions or domains
+- **Export & Sharing**: Export conversations and council decisions in various formats
+- **Integration Plugins**: Connect with external tools and knowledge bases for enhanced responses
 
 ## Vibe Code Alert
 
@@ -47,14 +66,14 @@ cd ..
 
 **Install and configure LM Studio:**
 
-1. Download and install [LM Studio](https://lmstudio.ai/)
-2. Download the following models:
+1. Download and install [LM Studio](https://lmstudio.ai/), [Ollama](https://ollama.com/), or similar local inference server
+2. Download the following models (note: these work well but may not be the best available - see [Planned Improvements](#planned-improvements) section):
    - `microsoft/phi-4-mini-reasoning`
    - `apollo-v0.1-4b-thinking-qx86x-hi-mlx`
    - `ai21-jamba-reasoning-3b-hi-mlx`
    - `qwen/qwen3-4b-thinking-2507`
-3. Start LM Studio server (IP will be auto-detected or use localhost as fallback)
-4. Load all models in LM Studio
+3. Start your inference server (IP will be auto-detected or use localhost as fallback)
+4. Load all models in your inference server
 
 ### 3. Configure Server & Models
 
