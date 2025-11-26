@@ -126,15 +126,8 @@ function App() {
   const handleNewConversation = async () => {
     try {
       const newConv = await api.createConversation();
-      setConversations([
-        { 
-          id: newConv.id, 
-          created_at: newConv.created_at, 
-          title: newConv.title,
-          message_count: 0 
-        },
-        ...conversations,
-      ]);
+      // Refresh conversations list to maintain proper sorting order
+      await loadConversations();
       setCurrentConversationId(newConv.id);
     } catch (error) {
       console.error('Failed to create conversation:', error);

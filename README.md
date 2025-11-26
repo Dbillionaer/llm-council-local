@@ -323,6 +323,14 @@ npm run dev
 
 Then open http://localhost:5173 in your browser.
 
+## Recent Updates
+
+### Conversation Sorting (v2.4.0)
+- **Enhanced UX:** Conversations now display in chronological order (newest first) for improved accessibility
+- **Backend Sorting:** Conversations sorted by creation timestamp at the storage layer
+- **Frontend Optimization:** UI preserves server-side ordering for consistent user experience
+- **Real-time Updates:** New conversations appear at the top of the list immediately
+
 ## Tech Stack
 
 - **Backend:** FastAPI (Python 3.10+), async httpx, LM Studio API, multi-round deliberation, background title generation, conversation management, dynamic configuration

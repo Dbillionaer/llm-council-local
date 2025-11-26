@@ -331,7 +331,7 @@ Provide a clear, well-reasoned final answer that represents the council's collec
     messages = [{"role": "user", "content": chairman_prompt}]
 
     # Query the chairman model with extended timeout for complex synthesis
-    response = await query_model(CHAIRMAN_MODEL, messages, timeout=180.0)
+    response = await query_model(CHAIRMAN_MODEL, messages, timeout=300.0)
 
     if response is None:
         # Fallback if chairman fails
@@ -582,7 +582,7 @@ Provide a clear, well-reasoned final answer that represents the council's collec
     messages = [{"role": "user", "content": chairman_prompt}]
 
     # Query the chairman model with extended timeout for complex synthesis
-    response = await query_model(CHAIRMAN_MODEL, messages, timeout=240.0)  # Extra time for multi-round
+    response = await query_model(CHAIRMAN_MODEL, messages, timeout=300.0)  # Extra time for multi-round
 
     if response is None:
         # Fallback if chairman fails

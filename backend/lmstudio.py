@@ -8,7 +8,7 @@ from .config_loader import get_model_connection_info
 async def query_model(
     model: str,
     messages: List[Dict[str, str]],
-    timeout: float = 120.0
+    timeout: float = 30.0
 ) -> Optional[Dict[str, Any]]:
     """
     Query a single model via LM Studio API.
@@ -51,8 +51,19 @@ async def query_model(
             data = response.json()
             message = data['choices'][0]['message']
 
+            # For thinking/reasoning models, extract content from reasoning_content if main content is empty
+            content = message.get('content')
+            reasoning_content = message.get('reasoning_content', '')
+            
+            # If content is empty or None, try to use reasoning_content for thinking models
+            if not content and reasoning_content:
+                # Extract the final answer from reasoning content if available
+                # For title generation, we want the complete reasoning as it often contains the title
+                content = reasoning_content
+
             return {
-                'content': message.get('content'),
+                'content': content,
+                'reasoning_content': reasoning_content,
                 'reasoning_details': message.get('reasoning_details')
             }
 

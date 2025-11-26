@@ -76,6 +76,11 @@ class TitleGenerationService:
                 print(f"Conversation {conversation_id} not found for immediate generation")
                 return False
             
+            # Verify the user message is provided
+            if not user_message or not user_message.strip():
+                print(f"No user message provided for immediate title generation of {conversation_id}")
+                return False
+            
             current_title = conversation.get("title", "").strip()
             if not self._is_generic_title(current_title):
                 print(f"Conversation {conversation_id} already has meaningful title: {current_title}")
@@ -208,6 +213,18 @@ Title:"""
                 print(f"Conversation {conversation_id} not found")
                 return False
             
+            # Check if conversation has messages before queueing
+            messages = conversation.get("messages", [])
+            if not messages:
+                print(f"Conversation {conversation_id} has no messages, skipping title generation")
+                return False
+            
+            # Check if there are any user messages
+            has_user_message = any(msg.get("role") == "user" for msg in messages)
+            if not has_user_message:
+                print(f"Conversation {conversation_id} has no user messages, skipping title generation")
+                return False
+            
             # Check if already has a meaningful title
             current_title = conversation.get("title", "").strip()
             if current_title and not self._is_generic_title(current_title):
@@ -233,19 +250,32 @@ Title:"""
         conversations = list_conversations()
         queued_count = 0
         
-        for conv_id in conversations:
+        for conversation in conversations:
             try:
-                conversation = load_conversation(conv_id)
-                if conversation and self._needs_title_generation(conversation):
+                conv_id = conversation.get("id")
+                if not conv_id:
+                    continue
+                    
+                if self._needs_title_generation(conversation):
                     await self.queue_title_generation(conv_id, priority=1)
                     queued_count += 1
             except Exception as e:
-                print(f"Error checking conversation {conv_id}: {e}")
+                print(f"Error checking conversation {conversation.get('id', 'unknown')}: {e}")
         
         print(f"Queued {queued_count} conversations for title generation")
     
     def _needs_title_generation(self, conversation: Dict) -> bool:
         """Check if conversation needs title generation."""
+        # Don't generate titles for empty conversations
+        messages = conversation.get("messages", [])
+        if not messages:
+            return False
+        
+        # Check if there are any user messages
+        has_user_message = any(msg.get("role") == "user" for msg in messages)
+        if not has_user_message:
+            return False
+        
         title = conversation.get("title", "").strip()
         if not title:
             return True

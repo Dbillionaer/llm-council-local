@@ -131,9 +131,8 @@ async def create_conversation(request: CreateConversationRequest):
     """Create a new conversation with ID-based title."""
     conversation = storage.create_conversation_with_id_title()
     
-    # Queue for title generation
-    title_service = get_title_service()
-    await title_service.queue_title_generation(conversation["id"], priority=0)
+    # Don't queue empty conversations for title generation
+    # Title generation will be triggered when the first message is added
     
     return conversation
 
@@ -192,7 +191,8 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
     # If this is the first message and has generic title, trigger immediate title generation
     if is_first_message and current_title.startswith("Conversation "):
         title_service = get_title_service()
-        await title_service.generate_title_immediate(conversation_id, request.content)
+        # Run in background without blocking the council process
+        asyncio.create_task(title_service.generate_title_immediate(conversation_id, request.content))
 
     # Run the 3-stage council process
     stage1_results, stage2_results, stage3_result, metadata = await run_full_council(
@@ -239,7 +239,8 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             # Start immediate title generation if needed (non-blocking)
             if is_first_message and current_title.startswith("Conversation "):
                 title_service = get_title_service()
-                await title_service.generate_title_immediate(conversation_id, request.content)
+                # Use asyncio.create_task to run in background without blocking
+                asyncio.create_task(title_service.generate_title_immediate(conversation_id, request.content))
                 yield f"data: {json.dumps({'type': 'title_generation_started'})}\n\n"
 
             # Stage 1: Collect responses
@@ -339,17 +340,6 @@ async def websocket_title_updates(websocket: WebSocket):
     finally:
         # Unregister when connection closes
         title_service.unregister_websocket(client_id)
-    conversation = storage.get_conversation(conversation_id)
-    if conversation is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    
-    return {
-        "conversation_id": conversation_id,
-        "title": conversation.get("title", ""),
-        "title_status": conversation.get("title_status", "pending"),
-        "title_generation_status": conversation.get("title_generation_status", {}),
-        "title_generated_at": conversation.get("title_generated_at")
-    }
 
 
 
