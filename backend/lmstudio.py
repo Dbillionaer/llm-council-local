@@ -2,7 +2,7 @@
 
 import httpx
 from typing import List, Dict, Any, Optional
-from .config import LM_STUDIO_API_ENDPOINT
+from .config_loader import get_model_connection_info
 
 
 async def query_model(
@@ -21,9 +21,18 @@ async def query_model(
     Returns:
         Response dict with 'content' and optional 'reasoning_details', or None if failed
     """
+    # Get connection info for this specific model
+    connection_info = get_model_connection_info(model)
+    api_endpoint = connection_info["api_endpoint"]
+    api_key = connection_info["api_key"]
+    
     headers = {
         "Content-Type": "application/json",
     }
+    
+    # Add API key if provided
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
 
     payload = {
         "model": model,
@@ -33,7 +42,7 @@ async def query_model(
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
-                LM_STUDIO_API_ENDPOINT,
+                api_endpoint,
                 headers=headers,
                 json=payload
             )
@@ -48,7 +57,7 @@ async def query_model(
             }
 
     except Exception as e:
-        print(f"Error querying model {model} via LM Studio: {e}")
+        print(f"Error querying model {model} at {api_endpoint}: {e}")
         # Print more detailed error info for debugging
         import traceback
         print(f"Full traceback: {traceback.format_exc()}")

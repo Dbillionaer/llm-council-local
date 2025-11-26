@@ -2,30 +2,47 @@
   "server": {
     "ip": "",
     "port": "11434",
-    "base_url_template": "http://{ip}:{port}/v1"
+    "base_url_template": "http://{ip}:{port}/v1",
+    "api_key": ""
   },
   "models": {
     "council": [
       {
         "id": "microsoft/phi-4-mini-reasoning",
         "name": "Phi-4 Mini Reasoning",
-        "description": "Microsoft's reasoning-optimized model"
+        "description": "Microsoft's reasoning-optimized model",
+        "ip": "",
+        "port": "",
+        "base_url_template": "",
+        "api_key": ""
       },
       {
         "id": "apollo-v0.1-4b-thinking-qx86x-hi-mlx",
         "name": "Apollo 4B Thinking",
-        "description": "Apollo's thinking model with MLX optimization"
+        "description": "Apollo's thinking model with MLX optimization",
+        "ip": "",
+        "port": "",
+        "base_url_template": "",
+        "api_key": ""
       },
       {
         "id": "ai21-jamba-reasoning-3b-hi-mlx",
         "name": "AI21 Jamba Reasoning",
-        "description": "AI21's Jamba reasoning model"
+        "description": "AI21's Jamba reasoning model",
+        "ip": "",
+        "port": "",
+        "base_url_template": "",
+        "api_key": ""
       }
     ],
     "chairman": {
       "id": "qwen/qwen3-4b-thinking-2507",
       "name": "Qwen3-4B Thinking",
-      "description": "Qwen's 4B thinking model for synthesis"
+      "description": "Qwen's 4B thinking model for synthesis",
+      "ip": "",
+      "port": "",
+      "base_url_template": "",
+      "api_key": ""
     }
   },
   "deliberation": {
@@ -43,7 +60,8 @@
     "auto_expand_thinking": true
   },
   "metadata": {
-    "version": "2.1",
-    "updated": "2025-11-26T08:18:17.110Z"
+    "version": "2.2",
+    "updated": "2025-11-26T12:10:33.579Z",
+    "changes": "Added per-model connection configuration support"
   }
 }

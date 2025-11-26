@@ -226,7 +226,74 @@ def get_title_generation_config() -> Dict[str, Any]:
         "auto_expand_thinking": True
     })
 
-def get_model_info(model_id: str) -> Dict[str, str]:
+def resolve_model_connection_params(model: Dict[str, Any], server_config: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Resolve connection parameters for a specific model.
+    
+    Args:
+        model: Model configuration dict
+        server_config: Server configuration dict with defaults
+    
+    Returns:
+        Dict with resolved connection parameters
+    """
+    # Parameter resolution order: model-specific -> server default -> system default
+    
+    # Get model-specific parameters (empty strings are considered "not set")
+    model_ip = model.get("ip", "").strip()
+    model_port = model.get("port", "").strip()
+    model_base_url = model.get("base_url_template", "").strip()
+    model_api_key = model.get("api_key", "").strip()
+    
+    # Get server defaults
+    server_ip = server_config.get("ip", "").strip()
+    server_port = server_config.get("port", "11434").strip()
+    server_base_url = server_config.get("base_url_template", "http://{ip}:{port}/v1").strip()
+    server_api_key = server_config.get("api_key", "").strip()
+    
+    # Resolve each parameter
+    resolved_ip = model_ip or server_ip or "127.0.0.1"
+    resolved_port = model_port or server_port or "11434"
+    resolved_api_key = model_api_key or server_api_key
+    
+    # Handle base URL template
+    if model_base_url:
+        resolved_base_url = model_base_url
+    elif server_base_url:
+        resolved_base_url = server_base_url
+    else:
+        resolved_base_url = "http://{ip}:{port}/v1"
+    
+    # Format the base URL with resolved IP and port
+    formatted_base_url = resolved_base_url.format(ip=resolved_ip, port=resolved_port)
+    
+    return {
+        "ip": resolved_ip,
+        "port": resolved_port,
+        "base_url": formatted_base_url,
+        "api_key": resolved_api_key,
+        "api_endpoint": f"{formatted_base_url}/chat/completions"
+    }
+
+def get_model_connection_info(model_id: str) -> Dict[str, str]:
+    """Get connection information for a specific model."""
+    config = load_config()
+    server_config = config.get("server", {})
+    
+    # Find model in configuration
+    models = config["models"]
+    
+    # Check council models
+    for model in models["council"]:
+        if model["id"] == model_id:
+            return resolve_model_connection_params(model, server_config)
+    
+    # Check chairman model
+    if models["chairman"]["id"] == model_id:
+        return resolve_model_connection_params(models["chairman"], server_config)
+    
+    # Fallback to server defaults if model not found
+    return resolve_model_connection_params({}, server_config)
     """Get detailed information about a specific model."""
     config = load_config()
     models = config["models"]

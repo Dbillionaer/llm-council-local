@@ -25,6 +25,15 @@ In a bit more detail, here is what happens when you submit a query:
 - **Dynamic Configuration**: Change models and settings without code modifications
 - **Local Privacy**: All processing happens locally via LM Studio - no data sent to external services
 
+## Recent Changes
+
+- ✅ **Per-Model Connection Configuration**: Individual connection settings (IP, port, API base URL, API keys) for each model, enabling mixed deployment scenarios
+- ✅ **Enhanced Model Validation**: Validates each model against its configured endpoint with detailed error reporting
+- ✅ **Background Title Generation**: Automatic meaningful conversation titles with real-time UI updates
+- ✅ **Multi-Round Deliberation**: Configurable deliberation rounds with cross-review and refinement
+- ✅ **Conversation Management**: Soft delete (recycle bin), restore, and permanent deletion with improved UI/UX
+- ✅ **Dynamic Configuration**: Runtime model and server configuration without code changes
+
 ## Planned Improvements
 
 - **Model Quality Rating & Voting**: Council members rate and vote on each other's responses to automatically select the best-performing models
@@ -81,7 +90,8 @@ The application automatically detects your local IP and validates model availabi
   "server": {
     "ip": "",
     "port": "11434", 
-    "base_url_template": "http://{ip}:{port}/v1"
+    "base_url_template": "http://{ip}:{port}/v1",
+    "api_key": ""
   }
 }
 ```
@@ -89,6 +99,7 @@ The application automatically detects your local IP and validates model availabi
 - `ip`: Leave empty for auto-detection, or specify a custom IP address
 - `port`: LM Studio server port (default: 11434)
 - `base_url_template`: URL template for API endpoints
+- `api_key`: Global API key (if required by your LLM server)
 
 **Model Configuration:**
 
@@ -99,23 +110,39 @@ The application automatically detects your local IP and validates model availabi
       {
         "id": "microsoft/phi-4-mini-reasoning",
         "name": "Phi-4 Mini Reasoning",
-        "description": "Microsoft's reasoning-optimized model"
+        "description": "Microsoft's reasoning-optimized model",
+        "ip": "",
+        "port": "",
+        "base_url_template": "",
+        "api_key": ""
       },
       {
         "id": "apollo-v0.1-4b-thinking-qx86x-hi-mlx",
         "name": "Apollo 4B Thinking", 
-        "description": "Apollo's thinking model with MLX optimization"
+        "description": "Apollo's thinking model with MLX optimization",
+        "ip": "",
+        "port": "",
+        "base_url_template": "",
+        "api_key": ""
       },
       {
         "id": "ai21-jamba-reasoning-3b-hi-mlx",
         "name": "AI21 Jamba Reasoning",
-        "description": "AI21's Jamba reasoning model"
+        "description": "AI21's Jamba reasoning model",
+        "ip": "",
+        "port": "",
+        "base_url_template": "",
+        "api_key": ""
       }
     ],
     "chairman": {
       "id": "qwen/qwen3-4b-thinking-2507",
       "name": "Qwen3-4B Thinking",
-      "description": "Qwen's 4B thinking model for synthesis"
+      "description": "Qwen's 4B thinking model for synthesis",
+      "ip": "",
+      "port": "",
+      "base_url_template": "",
+      "api_key": ""
     }
   },
   "deliberation": {
@@ -131,6 +158,38 @@ The application automatically detects your local IP and validates model availabi
     "retry_attempts": 3,
     "thinking_models": ["thinking", "reasoning", "o1"],
     "auto_expand_thinking": true
+  }
+}
+```
+
+**Per-Model Connection Parameters:**
+
+Each model supports individual connection settings that override server defaults:
+
+- **ip, port, base_url_template, api_key**: Model-specific connection parameters
+- **Empty values**: Inherit from server configuration
+- **Use case examples**:
+  - Different models hosted on different servers
+  - Some models requiring authentication, others not
+  - Mixed deployment (local + remote models)
+
+**Example Mixed Configuration:**
+```json
+{
+  "server": {
+    "ip": "192.168.1.111", 
+    "port": "11434",
+    "base_url_template": "http://{ip}:{port}/v1",
+    "api_key": ""
+  },
+  "models": {
+    "chairman": {
+      "id": "qwen/qwen3-4b-thinking-2507",
+      "ip": "192.168.1.100",
+      "port": "8080",
+      "base_url_template": "http://{ip}:{port}/api/v1", 
+      "api_key": "special-key"
+    }
   }
 }
 ```

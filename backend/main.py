@@ -17,7 +17,6 @@ from .council import run_full_council, stage1_collect_responses, stage2_collect_
 from .title_service import initialize_title_service, shutdown_title_service, get_title_service
 from .model_validator import validate_models
 from .config_loader import load_config
-from .config import set_api_endpoints
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -29,22 +28,26 @@ async def lifespan(app: FastAPI):
     print("🔍 Validating models and server connectivity...")
     try:
         config = load_config()
-        success, message, base_url = validate_models(config)
+        success, message, validated_models = validate_models(config)
         
         if not success:
             print(f"❌ Model validation failed: {message}")
             print("🛑 Please check your LLM server and model configuration.")
             print("💡 Troubleshooting:")
-            print("   - Ensure LM Studio is running")
-            print("   - Check if models are loaded in LM Studio")
+            print("   - Ensure LM Studio/Ollama is running")
+            print("   - Check if models are loaded in your LLM server")
             print("   - Verify network connectivity")
             print("   - Check config.json model IDs match available models")
+            print("   - Check per-model connection parameters if configured")
             sys.exit(1)
         
-        # Set API endpoints with validated URL
-        set_api_endpoints(base_url)
+        # The validation process now handles per-model configuration
         print(f"✅ Model validation successful: {message}")
-        print(f"🌐 Using LLM server at: {base_url}")
+        if validated_models:
+            print("📊 Validated models:")
+            for model_id, connection_info in validated_models.items():
+                endpoint = connection_info["api_endpoint"]
+                print(f"   - {model_id} → {endpoint}")
         
     except Exception as e:
         print(f"❌ Error during model validation: {e}")
