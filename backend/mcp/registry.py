@@ -169,7 +169,9 @@ class MCPRegistry:
         if not self.all_tools:
             return False
         
-        # Simple heuristics for calculator
+        query_lower = query.lower()
+        
+        # Calculator indicators
         math_indicators = [
             "calculate", "compute", "what is", "how much",
             "+", "-", "*", "/", "×", "÷", "plus", "minus",
@@ -177,8 +179,20 @@ class MCPRegistry:
             "sum", "difference", "product", "quotient"
         ]
         
-        query_lower = query.lower()
-        return any(ind in query_lower for ind in math_indicators)
+        # Web search indicators - time-sensitive, current events, specific entities
+        search_indicators = [
+            "current", "latest", "recent", "today", "yesterday",
+            "this week", "this month", "this year", "2024", "2025",
+            "news", "update", "price", "stock", "weather",
+            "who is", "what happened", "when did", "where is",
+            "search for", "look up", "find out", "google",
+            "breaking", "announced", "released", "launched"
+        ]
+        
+        has_math = any(ind in query_lower for ind in math_indicators)
+        has_search = any(ind in query_lower for ind in search_indicators)
+        
+        return has_math or has_search
 
 
 # Singleton instance

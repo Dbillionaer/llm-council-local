@@ -98,8 +98,8 @@
     "connection_timeout": 30
   },
   "metadata": {
-    "version": "2.3",
-    "updated": "2025-11-27T00:46:00.114Z",
-    "changes": "Added response_config for brevity settings and max_tokens"
+    "version": "2.4",
+    "updated": "2025-11-27T12:15:00.000Z",
+    "changes": "Added websearch MCP server for web search capability"
   }
 }
