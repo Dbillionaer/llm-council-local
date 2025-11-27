@@ -18,6 +18,12 @@
       "command": ["python3", "-m", "mcp_servers.system_date_time.server"],
       "port": null,
       "description": "Get current system date and time in various formats"
+    },
+    {
+      "name": "retrieve-web-page",
+      "command": ["python3", "-m", "mcp_servers.retrieve_web_page.server"],
+      "port": null,
+      "description": "Returns the webpage's HTML content from a specified URL"
     }
   ]
 }
