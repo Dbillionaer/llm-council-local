@@ -7,6 +7,7 @@ export default function Stage3({ finalResponse, streaming }) {
   const thinkingContent = streaming?.thinking || '';
   const isStreaming = streaming?.isStreaming && !finalResponse?.response;
   const modelName = finalResponse?.model || '';
+  const tokensPerSecond = streaming?.tokensPerSecond;
 
   if (!displayContent && !isStreaming) {
     return null;
@@ -18,6 +19,7 @@ export default function Stage3({ finalResponse, streaming }) {
       <div className="final-response">
         <div className="chairman-label">
           Presenter: {modelName ? (modelName.split('/')[1] || modelName) : 'Formatting...'}
+          {tokensPerSecond && <span className="tps-badge">{tokensPerSecond} tok/s</span>}
           {isStreaming && <span className="streaming-badge">Streaming...</span>}
         </div>
         

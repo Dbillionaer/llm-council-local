@@ -22,6 +22,7 @@ export default function Stage1({ responses, streaming }) {
   const displayContent = completedResponse?.response || streamingData?.content || '';
   const thinkingContent = streamingData?.thinking || '';
   const isStreaming = streamingData?.isStreaming && !completedResponse;
+  const tokensPerSecond = streamingData?.tokensPerSecond;
 
   return (
     <div className="stage stage1">
@@ -32,6 +33,7 @@ export default function Stage1({ responses, streaming }) {
           const modelStreaming = streaming?.[model];
           const modelComplete = responses?.find(r => r.model === model);
           const hasContent = modelComplete || modelStreaming?.content;
+          const modelTps = modelStreaming?.tokensPerSecond;
           
           return (
             <button
@@ -40,6 +42,7 @@ export default function Stage1({ responses, streaming }) {
               onClick={() => setActiveTab(index)}
             >
               {model.split('/')[1] || model}
+              {modelTps && <span className="tps-indicator">{modelTps} t/s</span>}
               {modelStreaming?.isStreaming && !modelComplete && <span className="streaming-indicator">●</span>}
             </button>
           );
@@ -49,6 +52,7 @@ export default function Stage1({ responses, streaming }) {
       <div className="tab-content">
         <div className="model-name">
           {currentModel}
+          {tokensPerSecond && <span className="tps-badge">{tokensPerSecond} tok/s</span>}
           {isStreaming && <span className="streaming-badge">Streaming...</span>}
         </div>
         

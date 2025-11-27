@@ -30,6 +30,14 @@
   animation: pulse 1s infinite;
 }
 
+.stage3 .tps-badge {
+  background: #e8f5e9;
+  color: #2d8a2d;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }

@@ -396,7 +396,7 @@ async def send_message_stream_tokens(conversation_id: str, request: SendMessageR
             
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
 
-            # Stage 2: Stream rankings
+            # Stage 2: Stream rankings with multi-round deliberation
             yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
             
             stage2_task = asyncio.create_task(
@@ -405,6 +405,7 @@ async def send_message_stream_tokens(conversation_id: str, request: SendMessageR
             
             stage2_results = None
             label_to_model = None
+            deliberation_metadata = None
             while stage2_results is None:
                 try:
                     event_type, data = await asyncio.wait_for(
@@ -413,7 +414,7 @@ async def send_message_stream_tokens(conversation_id: str, request: SendMessageR
                     yield f"data: {json.dumps({'type': event_type, **data})}\n\n"
                 except asyncio.TimeoutError:
                     if stage2_task.done():
-                        stage2_results, label_to_model = stage2_task.result()
+                        stage2_results, label_to_model, deliberation_metadata = stage2_task.result()
             
             # Drain remaining stage2 events
             while not events_queue.empty():
@@ -421,7 +422,7 @@ async def send_message_stream_tokens(conversation_id: str, request: SendMessageR
                 yield f"data: {json.dumps({'type': event_type, **data})}\n\n"
             
             aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
-            yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings}})}\n\n"
+            yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings, 'deliberation': deliberation_metadata}})}\n\n"
 
             # Stage 3: Stream final synthesis
             yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"

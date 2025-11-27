@@ -1,6 +1,7 @@
 """3-stage LLM Council orchestration with multi-round deliberation."""
 
 import time
+import re
 from typing import List, Dict, Any, Tuple, AsyncGenerator, Callable, Optional
 from .lmstudio import query_models_parallel, query_model_with_retry, query_model_streaming
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL, FORMATTER_MODEL
@@ -11,6 +12,97 @@ from .model_metrics import (
     get_evaluator_for_model,
     get_valid_models
 )
+
+
+# ============== Token Tracking ==============
+
+class TokenTracker:
+    """Track tokens per second for streaming models."""
+    
+    def __init__(self):
+        self.start_times: Dict[str, float] = {}
+        self.token_counts: Dict[str, int] = {}
+    
+    def record_token(self, model: str, delta: str) -> float:
+        """Record a token and return current tokens/second."""
+        now = time.time()
+        
+        if model not in self.start_times:
+            self.start_times[model] = now
+            self.token_counts[model] = 0
+        
+        # Count tokens (approximate by whitespace-separated words + 1 for partial)
+        self.token_counts[model] += max(1, len(delta.split()))
+        
+        elapsed = now - self.start_times[model]
+        if elapsed > 0:
+            return round(self.token_counts[model] / elapsed, 1)
+        return 0.0
+    
+    def get_final_tps(self, model: str) -> float:
+        """Get final tokens/second for a model."""
+        if model not in self.start_times:
+            return 0.0
+        elapsed = time.time() - self.start_times[model]
+        if elapsed > 0:
+            return round(self.token_counts.get(model, 0) / elapsed, 1)
+        return 0.0
+
+
+# ============== Quality Rating Extraction ==============
+
+def extract_quality_ratings(ranking_text: str) -> Dict[str, float]:
+    """
+    Extract quality ratings from ranking text.
+    Looks for patterns like:
+    - "Response A (4/5)" or "Response A: 4/5"
+    - "Response B - 2/5" or "Response B: 2 out of 5"
+    
+    Returns dict mapping response labels to ratings (1-5 scale).
+    """
+    ratings = {}
+    
+    # Pattern 1: "Response X (N/5)" or "Response X: N/5"
+    pattern1 = r'Response\s+([A-Z])\s*[:\(]\s*(\d(?:\.\d)?)\s*/\s*5'
+    for match in re.finditer(pattern1, ranking_text, re.IGNORECASE):
+        label = f"Response {match.group(1).upper()}"
+        rating = float(match.group(2))
+        ratings[label] = min(5, max(1, rating))
+    
+    # Pattern 2: "Response X - N/5" 
+    pattern2 = r'Response\s+([A-Z])\s*-\s*(\d(?:\.\d)?)\s*/\s*5'
+    for match in re.finditer(pattern2, ranking_text, re.IGNORECASE):
+        label = f"Response {match.group(1).upper()}"
+        if label not in ratings:
+            rating = float(match.group(2))
+            ratings[label] = min(5, max(1, rating))
+    
+    # Pattern 3: Infer from ranking position if no explicit ratings
+    # (first place = 5, second = 4, etc.)
+    if not ratings:
+        parsed = parse_ranking_from_text(ranking_text)
+        for i, label in enumerate(parsed):
+            ratings[label] = max(1, 5 - i)
+    
+    return ratings
+
+
+def check_quality_threshold(all_ratings: List[Dict[str, float]], threshold: float = 0.3) -> Tuple[bool, List[str]]:
+    """
+    Check if any response is rated below threshold (30% = 1.5/5).
+    
+    Returns:
+        Tuple of (should_continue, list of low-rated response labels)
+    """
+    min_rating = threshold * 5  # Convert percentage to 1-5 scale
+    low_rated = set()
+    
+    for ratings in all_ratings:
+        for label, rating in ratings.items():
+            if rating < min_rating:
+                low_rated.add(label)
+    
+    return len(low_rated) > 0, list(low_rated)
 
 
 async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
@@ -639,6 +731,7 @@ Question: {user_query}"""
     
     messages = [{"role": "user", "content": prompt}]
     stage1_results = []
+    token_tracker = TokenTracker()
     
     async def stream_model(model: str, retry_count: int = 0):
         """Stream a single model's response with retry on empty/error."""
@@ -649,10 +742,12 @@ Question: {user_query}"""
         async for chunk in query_model_streaming(model, messages, max_tokens=max_tokens):
             if chunk["type"] == "token":
                 content = chunk["content"]
+                tps = token_tracker.record_token(model, chunk["delta"])
                 on_event("stage1_token", {
                     "model": model,
                     "delta": chunk["delta"],
-                    "content": content
+                    "content": content,
+                    "tokens_per_second": tps
                 })
             elif chunk["type"] == "thinking":
                 reasoning = chunk["content"]
@@ -694,7 +789,8 @@ Question: {user_query}"""
                 on_event("stage1_model_complete", {
                     "model": model,
                     "content": final_content,
-                    "reasoning_content": chunk.get("reasoning_content", "")
+                    "reasoning_content": chunk.get("reasoning_content", ""),
+                    "tokens_per_second": token_tracker.get_final_tps(model)
                 })
                 return {
                     "model": model,
@@ -856,9 +952,15 @@ async def stage2_collect_rankings_streaming(
     user_query: str,
     stage1_results: List[Dict[str, Any]],
     on_event: Callable[[str, Dict[str, Any]], None]
-) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+) -> Tuple[List[Dict[str, Any]], Dict[str, str], Dict[str, Any]]:
     """
-    Stage 2 with streaming: Collect rankings from all council models.
+    Stage 2 with streaming: Multi-round deliberation with quality-based triggering.
+    
+    Each round:
+    1. Models rank AND rate (1-5) each response with brief feedback
+    2. If any response rated <30% (1.5/5), trigger refinement round
+    3. Refinement: models improve their response based on peer feedback
+    4. Repeat until all ratings >=30% or max_rounds reached
 
     Args:
         user_query: The original user query
@@ -866,14 +968,17 @@ async def stage2_collect_rankings_streaming(
         on_event: Callback for streaming events
 
     Returns:
-        Tuple of (rankings_list, label_to_model mapping)
+        Tuple of (final_rankings, label_to_model, deliberation_metadata)
     """
     import asyncio
     
-    # Get response config for max_tokens
+    # Get config
     response_config = get_response_config()
+    deliberation_config = get_deliberation_config()
     max_tokens = response_config.get("max_tokens", {}).get("stage2")
     response_style = response_config.get("response_style", "standard")
+    max_rounds = deliberation_config.get("max_rounds", 3)
+    quality_threshold = 0.3  # 30% = 1.5/5
     
     # Create anonymized labels
     labels = [chr(65 + i) for i in range(len(stage1_results))]
@@ -882,100 +987,245 @@ async def stage2_collect_rankings_streaming(
         for label, result in zip(labels, stage1_results)
     }
     
-    # Build ranking prompt - concise version if configured
-    responses_text = "\n\n".join([
-        f"Response {label}:\n{result['response']}"
+    # Track current responses (may be refined across rounds)
+    current_responses = {
+        f"Response {label}": result['response']
         for label, result in zip(labels, stage1_results)
-    ])
+    }
     
-    if response_style == "concise":
-        ranking_prompt = f"""Evaluate these responses to: "{user_query}"
-
-{responses_text}
-
-Briefly assess each response (1-2 sentences each), then provide:
-
-FINAL RANKING:
-1. Response X
-2. Response Y
-(etc.)"""
-    else:
-        ranking_prompt = f"""You are evaluating different responses to the following question:
-
-Question: {user_query}
-
-Here are the responses from different models (anonymized):
-
-{responses_text}
-
-Your task:
-1. First, evaluate each response individually. For each response, explain what it does well and what it does poorly.
-2. Then, at the very end of your response, provide a final ranking.
-
-IMPORTANT: Your final ranking MUST be formatted EXACTLY as follows:
-- Start with the line "FINAL RANKING:" (all caps, with colon)
-- Then list the responses from best to worst as a numbered list
-- Each line should be: number, period, space, then ONLY the response label (e.g., "1. Response A")
-- Do not add any other text or explanations in the ranking section
-
-Now provide your evaluation and ranking:"""
-
-    messages = [{"role": "user", "content": ranking_prompt}]
-    stage2_results = []
+    all_rounds_rankings = []
+    all_rounds_feedback = []
+    token_tracker = TokenTracker()
     
-    async def stream_ranking(model: str):
-        """Stream a single model's ranking."""
-        content = ""
-        reasoning = ""
+    for round_num in range(1, max_rounds + 1):
+        # Emit round start
+        on_event("round_start", {
+            "round": round_num,
+            "max_rounds": max_rounds,
+            "is_refinement": round_num > 1
+        })
         
-        async for chunk in query_model_streaming(model, messages, max_tokens=max_tokens):
-            if chunk["type"] == "token":
-                content = chunk["content"]
-                on_event("stage2_token", {
-                    "model": model,
-                    "delta": chunk["delta"],
-                    "content": content
-                })
-            elif chunk["type"] == "thinking":
-                reasoning = chunk["content"]
-                on_event("stage2_thinking", {
-                    "model": model,
-                    "delta": chunk["delta"],
-                    "thinking": reasoning
-                })
-            elif chunk["type"] == "complete":
-                full_text = chunk["content"]
-                parsed = parse_ranking_from_text(full_text)
-                on_event("stage2_model_complete", {
-                    "model": model,
-                    "ranking": full_text,
-                    "parsed_ranking": parsed
-                })
+        # Build responses text
+        responses_text = "\n\n".join([
+            f"{label}:\n{response}"
+            for label, response in current_responses.items()
+        ])
+        
+        # Build ranking prompt with quality ratings
+        if round_num == 1:
+            ranking_prompt = f"""Evaluate these responses to: "{user_query}"
+
+{responses_text}
+
+For EACH response, provide:
+1. Quality rating (1-5, where 1=poor, 5=excellent)
+2. Brief feedback (1 sentence on strengths/weaknesses)
+
+Then provide your FINAL RANKING with quality scores:
+FINAL RANKING:
+1. Response X (N/5) - brief reason
+2. Response Y (N/5) - brief reason
+(etc.)"""
+        else:
+            # Include feedback from previous round
+            prev_feedback = all_rounds_feedback[-1] if all_rounds_feedback else {}
+            feedback_text = "\n".join([
+                f"{label}: {feedback}"
+                for label, feedback in prev_feedback.items()
+            ])
+            
+            ranking_prompt = f"""Re-evaluate these REFINED responses to: "{user_query}"
+
+{responses_text}
+
+Previous round feedback:
+{feedback_text}
+
+For EACH response, provide:
+1. Quality rating (1-5) - did the response improve?
+2. Brief feedback (1 sentence)
+
+Then provide your FINAL RANKING with quality scores:
+FINAL RANKING:
+1. Response X (N/5) - brief reason
+2. Response Y (N/5) - brief reason
+(etc.)"""
+        
+        messages = [{"role": "user", "content": ranking_prompt}]
+        round_results = []
+        round_ratings = []
+        
+        async def stream_ranking(model: str):
+            """Stream a single model's ranking with quality ratings."""
+            content = ""
+            reasoning = ""
+            
+            async for chunk in query_model_streaming(model, messages, max_tokens=max_tokens):
+                if chunk["type"] == "token":
+                    content = chunk["content"]
+                    tps = token_tracker.record_token(model, chunk["delta"])
+                    on_event("stage2_token", {
+                        "model": model,
+                        "delta": chunk["delta"],
+                        "content": content,
+                        "round": round_num,
+                        "tokens_per_second": tps
+                    })
+                elif chunk["type"] == "thinking":
+                    reasoning = chunk["content"]
+                    on_event("stage2_thinking", {
+                        "model": model,
+                        "delta": chunk["delta"],
+                        "thinking": reasoning,
+                        "round": round_num
+                    })
+                elif chunk["type"] == "complete":
+                    full_text = chunk["content"]
+                    parsed = parse_ranking_from_text(full_text)
+                    ratings = extract_quality_ratings(full_text)
+                    on_event("stage2_model_complete", {
+                        "model": model,
+                        "ranking": full_text,
+                        "parsed_ranking": parsed,
+                        "quality_ratings": ratings,
+                        "round": round_num,
+                        "tokens_per_second": token_tracker.get_final_tps(model)
+                    })
+                    return {
+                        "model": model,
+                        "ranking": full_text,
+                        "parsed_ranking": parsed,
+                        "quality_ratings": ratings,
+                        "round": round_num
+                    }
+                elif chunk["type"] == "error":
+                    on_event("stage2_model_error", {
+                        "model": model,
+                        "error": chunk["error"],
+                        "round": round_num
+                    })
+                    return None
+            
+            if content:
+                parsed = parse_ranking_from_text(content)
+                ratings = extract_quality_ratings(content)
                 return {
                     "model": model,
-                    "ranking": full_text,
-                    "parsed_ranking": parsed
+                    "ranking": content,
+                    "parsed_ranking": parsed,
+                    "quality_ratings": ratings,
+                    "round": round_num
                 }
-            elif chunk["type"] == "error":
-                on_event("stage2_model_error", {
-                    "model": model,
-                    "error": chunk["error"]
-                })
-                return None
+            return None
         
-        if content:
-            parsed = parse_ranking_from_text(content)
-            return {"model": model, "ranking": content, "parsed_ranking": parsed}
-        return None
+        # Run all models in parallel
+        tasks = [stream_ranking(model) for model in COUNCIL_MODELS]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        for result in results:
+            if result and not isinstance(result, Exception):
+                round_results.append(result)
+                if result.get("quality_ratings"):
+                    round_ratings.append(result["quality_ratings"])
+        
+        all_rounds_rankings.append(round_results)
+        
+        # Check quality threshold
+        should_continue, low_rated = check_quality_threshold(round_ratings, quality_threshold)
+        
+        on_event("round_complete", {
+            "round": round_num,
+            "max_rounds": max_rounds,
+            "low_rated_responses": low_rated,
+            "triggered_next": should_continue and round_num < max_rounds
+        })
+        
+        # If quality is acceptable or we've hit max rounds, stop
+        if not should_continue or round_num >= max_rounds:
+            break
+        
+        # Refinement round: collect feedback and have models improve responses
+        feedback_by_label = {}
+        for result in round_results:
+            for label, rating in result.get("quality_ratings", {}).items():
+                if label not in feedback_by_label:
+                    feedback_by_label[label] = []
+                # Extract feedback from ranking text for this label
+                feedback_match = re.search(
+                    rf'{re.escape(label)}\s*[:\(]\s*\d[^-]*-\s*([^.]+\.)',
+                    result.get("ranking", ""),
+                    re.IGNORECASE
+                )
+                if feedback_match:
+                    feedback_by_label[label].append(feedback_match.group(1).strip())
+        
+        # Consolidate feedback
+        consolidated_feedback = {
+            label: " | ".join(feedbacks[:3]) if feedbacks else "No specific feedback"
+            for label, feedbacks in feedback_by_label.items()
+        }
+        all_rounds_feedback.append(consolidated_feedback)
+        
+        # Refine low-rated responses
+        on_event("refinement_start", {
+            "round": round_num + 1,
+            "responses_to_refine": low_rated
+        })
+        
+        for label in low_rated:
+            if label not in label_to_model:
+                continue
+            
+            model = label_to_model[label]
+            original_response = current_responses.get(label, "")
+            feedback = consolidated_feedback.get(label, "Improve clarity and completeness")
+            
+            refinement_prompt = f"""Your previous response to "{user_query}" received feedback from peer reviewers:
+
+YOUR ORIGINAL RESPONSE:
+{original_response}
+
+PEER FEEDBACK:
+{feedback}
+
+Please provide an IMPROVED response that addresses the feedback while maintaining your strengths. Be concise but thorough."""
+            
+            refine_messages = [{"role": "user", "content": refinement_prompt}]
+            refined_content = ""
+            
+            async for chunk in query_model_streaming(model, refine_messages, max_tokens=max_tokens):
+                if chunk["type"] == "token":
+                    refined_content = chunk["content"]
+                    tps = token_tracker.record_token(f"{model}_refine", chunk["delta"])
+                    on_event("refinement_token", {
+                        "model": model,
+                        "label": label,
+                        "delta": chunk["delta"],
+                        "content": refined_content,
+                        "tokens_per_second": tps
+                    })
+                elif chunk["type"] == "complete":
+                    refined_content = chunk["content"]
+                    on_event("refinement_complete", {
+                        "model": model,
+                        "label": label,
+                        "content": refined_content,
+                        "tokens_per_second": token_tracker.get_final_tps(f"{model}_refine")
+                    })
+            
+            if refined_content:
+                current_responses[label] = refined_content
     
-    tasks = [stream_ranking(model) for model in COUNCIL_MODELS]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+    # Return final round's rankings
+    final_rankings = all_rounds_rankings[-1] if all_rounds_rankings else []
     
-    for result in results:
-        if result and not isinstance(result, Exception):
-            stage2_results.append(result)
+    deliberation_metadata = {
+        "rounds_completed": len(all_rounds_rankings),
+        "max_rounds": max_rounds,
+        "all_rounds": all_rounds_rankings
+    }
     
-    return stage2_results, label_to_model
+    return final_rankings, label_to_model, deliberation_metadata
 
 
 async def stage3_synthesize_streaming(
@@ -1067,14 +1317,17 @@ Provide an expertly formatted final answer that represents the council's collect
     
     # Use formatter model (falls back to chairman if not configured)
     model_to_use = FORMATTER_MODEL
+    token_tracker = TokenTracker()
     
     async for chunk in query_model_streaming(model_to_use, messages, max_tokens=max_tokens):
         if chunk["type"] == "token":
             content = chunk["content"]
+            tps = token_tracker.record_token(model_to_use, chunk["delta"])
             on_event("stage3_token", {
                 "model": model_to_use,
                 "delta": chunk["delta"],
-                "content": content
+                "content": content,
+                "tokens_per_second": tps
             })
         elif chunk["type"] == "thinking":
             reasoning = chunk["content"]
@@ -1094,7 +1347,8 @@ Provide an expertly formatted final answer that represents the council's collect
             on_event("stage3_complete", {
                 "model": model_to_use,
                 "response": final_content,
-                "reasoning_content": reasoning_content
+                "reasoning_content": reasoning_content,
+                "tokens_per_second": token_tracker.get_final_tps(model_to_use)
             })
             return {
                 "model": model_to_use,

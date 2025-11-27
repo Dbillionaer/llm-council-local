@@ -146,6 +146,7 @@ export default function ChatInterface({
                       labelToModel={msg.metadata?.label_to_model}
                       aggregateRankings={msg.metadata?.aggregate_rankings}
                       streaming={msg.streaming?.stage2}
+                      roundInfo={msg.roundInfo}
                     />
                   )}
 

@@ -16,7 +16,19 @@ In a bit more detail, here is what happens when you submit a query:
 
 ## Key Features
 
-### Current Release (v0.3.4)
+### Current Release (v0.4.0)
+- **Quality-Based Multi-Round Deliberation**: Streaming multi-round with quality threshold
+  - Each model rates (1-5) AND ranks peer responses with brief feedback
+  - If any response rated <30%, triggers refinement round
+  - Low-rated responses are refined based on peer feedback
+  - Continues until quality threshold met or max_rounds reached
+- **Tokens/Second Display**: Real-time tok/s metrics during streaming
+  - Shows in tab headers and model labels
+  - Updates live as tokens stream
+- **Round Progress Indicator**: "Round X / Y" in Stage 2 header
+  - Shows "(Refinement)" label for refinement rounds
+
+### Previous Release (v0.3.4)
 - **Metrics Markdown**: Auto-generated `data/llm_metrics.md` with model rankings and scores
 
 ### Previous Release (v0.3.3)

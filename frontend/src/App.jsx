@@ -218,6 +218,7 @@ function App() {
                 ...(lastMsg.streaming.stage1[event.model] || {}),
                 content: event.content,
                 isStreaming: true,
+                tokensPerSecond: event.tokens_per_second,
               };
               return { ...prev, messages };
             });
@@ -243,6 +244,7 @@ function App() {
               const lastMsg = messages[messages.length - 1];
               if (lastMsg.streaming?.stage1?.[event.model]) {
                 lastMsg.streaming.stage1[event.model].isStreaming = false;
+                lastMsg.streaming.stage1[event.model].tokensPerSecond = event.tokens_per_second;
               }
               return { ...prev, messages };
             });
@@ -267,6 +269,32 @@ function App() {
             });
             break;
 
+          case 'round_start':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              if (!lastMsg.roundInfo) lastMsg.roundInfo = {};
+              lastMsg.roundInfo = {
+                current: event.round,
+                maxRounds: event.max_rounds,
+                isRefinement: event.is_refinement,
+              };
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'round_complete':
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              if (lastMsg.roundInfo) {
+                lastMsg.roundInfo.lowRatedResponses = event.low_rated_responses;
+                lastMsg.roundInfo.triggeredNext = event.triggered_next;
+              }
+              return { ...prev, messages };
+            });
+            break;
+
           case 'stage2_token':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
@@ -276,6 +304,7 @@ function App() {
                 ...(lastMsg.streaming.stage2[event.model] || {}),
                 content: event.content,
                 isStreaming: true,
+                tokensPerSecond: event.tokens_per_second,
               };
               return { ...prev, messages };
             });
@@ -301,6 +330,7 @@ function App() {
               const lastMsg = messages[messages.length - 1];
               if (lastMsg.streaming?.stage2?.[event.model]) {
                 lastMsg.streaming.stage2[event.model].isStreaming = false;
+                lastMsg.streaming.stage2[event.model].tokensPerSecond = event.tokens_per_second;
               }
               return { ...prev, messages };
             });
@@ -335,6 +365,7 @@ function App() {
                 ...(lastMsg.streaming.stage3 || {}),
                 content: event.content,
                 isStreaming: true,
+                tokensPerSecond: event.tokens_per_second,
               };
               return { ...prev, messages };
             });
@@ -362,6 +393,7 @@ function App() {
               lastMsg.loading.stage3 = false;
               if (lastMsg.streaming?.stage3) {
                 lastMsg.streaming.stage3.isStreaming = false;
+                lastMsg.streaming.stage3.tokensPerSecond = event.tokens_per_second;
               }
               return { ...prev, messages };
             });

@@ -14,7 +14,7 @@ function deAnonymizeText(text, labelToModel) {
   return result;
 }
 
-export default function Stage2({ rankings, labelToModel, aggregateRankings, streaming }) {
+export default function Stage2({ rankings, labelToModel, aggregateRankings, streaming, roundInfo }) {
   const [activeTab, setActiveTab] = useState(0);
 
   // Get models from either completed rankings or streaming state
@@ -35,10 +35,19 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, stre
   const thinkingContent = streamingData?.thinking || '';
   const isStreaming = streamingData?.isStreaming && !completedRanking;
   const parsedRanking = completedRanking?.parsed_ranking;
+  const tokensPerSecond = streamingData?.tokensPerSecond;
 
   return (
     <div className="stage stage2">
-      <h3 className="stage-title">Stage 2: Peer Rankings</h3>
+      <div className="stage-header">
+        <h3 className="stage-title">Stage 2: Peer Rankings</h3>
+        {roundInfo && roundInfo.maxRounds > 1 && (
+          <span className="round-indicator">
+            Round {roundInfo.current} / {roundInfo.maxRounds}
+            {roundInfo.isRefinement && ' (Refinement)'}
+          </span>
+        )}
+      </div>
 
       <h4>Raw Evaluations</h4>
       <p className="stage-description">
@@ -50,6 +59,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, stre
         {models.map((model, index) => {
           const modelStreaming = streaming?.[model];
           const modelComplete = rankings?.find(r => r.model === model);
+          const modelTps = modelStreaming?.tokensPerSecond;
           
           return (
             <button
@@ -58,6 +68,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, stre
               onClick={() => setActiveTab(index)}
             >
               {model.split('/')[1] || model}
+              {modelTps && <span className="tps-indicator">{modelTps} t/s</span>}
               {modelStreaming?.isStreaming && !modelComplete && <span className="streaming-indicator">●</span>}
             </button>
           );
@@ -67,6 +78,7 @@ export default function Stage2({ rankings, labelToModel, aggregateRankings, stre
       <div className="tab-content">
         <div className="ranking-model">
           {currentModel}
+          {tokensPerSecond && <span className="tps-badge">{tokensPerSecond} tok/s</span>}
           {isStreaming && <span className="streaming-badge">Streaming...</span>}
         </div>
         
