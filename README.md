@@ -16,7 +16,13 @@ In a bit more detail, here is what happens when you submit a query:
 
 ## Key Features
 
-### Current Release (v0.4.0)
+### Current Release (v0.5.0)
+- **Response Timing Display**: Real-time stopwatch showing thinking and total response time
+  - Displays `<thinking_seconds>s/<total_seconds>s` format next to tokens/s
+  - Orange-highlighted badge for easy visibility
+  - Tracks thinking phase separately from response generation
+
+### Previous Release (v0.4.0)
 - **Quality-Based Multi-Round Deliberation**: Streaming multi-round with quality threshold
   - Each model rates (1-5) AND ranks peer responses with brief feedback
   - If any response rated <30%, triggers refinement round
