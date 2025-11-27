@@ -27,3 +27,7 @@ tmp/
 TODO.md
 CHANGELOG.md
 FINDINGS.md
+llm_metrics.json
+
+# Internal documents
+.internal/

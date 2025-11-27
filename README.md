@@ -16,7 +16,13 @@ In a bit more detail, here is what happens when you submit a query:
 
 ## Key Features
 
-### Current Release (v0.3.0)
+### Current Release (v0.3.1)
+- **Auto Retry**: Council members retry up to 2 times on blank/failed responses
+- **Model Quality Metrics**: Automatic evaluation of responses to track model performance
+  - Metrics: verbosity, expertise, adherence, clarity, overall rating
+  - API: `/api/metrics` and `/api/metrics/ranking`
+
+### Previous Release (v0.3.0)
 - **Rich Formatted Output**: Presenter generates tables, headers, code blocks, and structured markdown
 - **Redo Message**: Re-run the council process with the same question (↻ icon)
 - **Edit Message**: Modify and resubmit any user message (✎ icon)

@@ -22,6 +22,7 @@ from .council import (
 from .title_generation import title_service
 from .model_validator import validate_models
 from .config_loader import load_config
+from .model_metrics import get_all_metrics, get_model_ranking
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -114,6 +115,18 @@ class Conversation(BaseModel):
 async def root():
     """Health check endpoint."""
     return {"status": "ok", "service": "LLM Council API"}
+
+
+@app.get("/api/metrics")
+async def get_metrics():
+    """Get all model quality metrics."""
+    return get_all_metrics()
+
+
+@app.get("/api/metrics/ranking")
+async def get_ranking():
+    """Get model ranking with key metrics."""
+    return get_model_ranking()
 
 
 @app.get("/api/conversations", response_model=List[ConversationMetadata])

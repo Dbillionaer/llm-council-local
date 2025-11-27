@@ -1,9 +1,16 @@
 """3-stage LLM Council orchestration with multi-round deliberation."""
 
+import time
 from typing import List, Dict, Any, Tuple, AsyncGenerator, Callable, Optional
 from .lmstudio import query_models_parallel, query_model_with_retry, query_model_streaming
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL, FORMATTER_MODEL
 from .config_loader import get_deliberation_rounds, get_deliberation_config, get_response_config
+from .model_metrics import (
+    record_query_result, 
+    record_evaluation, 
+    get_highest_rated_model, 
+    get_random_model
+)
 
 
 async def stage1_collect_responses(user_query: str) -> List[Dict[str, Any]]:
@@ -633,8 +640,9 @@ Question: {user_query}"""
     messages = [{"role": "user", "content": prompt}]
     stage1_results = []
     
-    async def stream_model(model: str):
-        """Stream a single model's response."""
+    async def stream_model(model: str, retry_count: int = 0):
+        """Stream a single model's response with retry on empty/error."""
+        max_retries = 2
         content = ""
         reasoning = ""
         
@@ -654,23 +662,60 @@ Question: {user_query}"""
                     "thinking": reasoning
                 })
             elif chunk["type"] == "complete":
+                final_content = chunk["content"]
+                # Check for empty/blank response
+                if not final_content or not final_content.strip():
+                    if retry_count < max_retries:
+                        on_event("stage1_model_retry", {
+                            "model": model,
+                            "retry": retry_count + 1,
+                            "reason": "empty response"
+                        })
+                        return await stream_model(model, retry_count + 1)
+                    else:
+                        on_event("stage1_model_error", {
+                            "model": model,
+                            "error": f"Empty response after {max_retries} retries"
+                        })
+                        return None
+                
                 on_event("stage1_model_complete", {
                     "model": model,
-                    "content": chunk["content"],
+                    "content": final_content,
                     "reasoning_content": chunk.get("reasoning_content", "")
                 })
                 return {
                     "model": model,
-                    "response": chunk["content"]
+                    "response": final_content
                 }
             elif chunk["type"] == "error":
-                on_event("stage1_model_error", {
-                    "model": model,
-                    "error": chunk["error"]
-                })
-                return None
+                # Retry on error
+                if retry_count < max_retries:
+                    on_event("stage1_model_retry", {
+                        "model": model,
+                        "retry": retry_count + 1,
+                        "reason": chunk["error"]
+                    })
+                    return await stream_model(model, retry_count + 1)
+                else:
+                    on_event("stage1_model_error", {
+                        "model": model,
+                        "error": f"{chunk['error']} (after {max_retries} retries)"
+                    })
+                    return None
         
-        return {"model": model, "response": content} if content else None
+        # End of stream without complete event - check if we got content
+        if not content or not content.strip():
+            if retry_count < max_retries:
+                on_event("stage1_model_retry", {
+                    "model": model,
+                    "retry": retry_count + 1,
+                    "reason": "incomplete stream"
+                })
+                return await stream_model(model, retry_count + 1)
+            return None
+        
+        return {"model": model, "response": content}
     
     # Run all models in parallel with streaming
     tasks = [stream_model(model) for model in COUNCIL_MODELS]
@@ -680,9 +725,107 @@ Question: {user_query}"""
         if result and not isinstance(result, Exception):
             stage1_results.append(result)
     
+    # Evaluate responses asynchronously (don't block main flow)
+    asyncio.create_task(_evaluate_responses_async(user_query, stage1_results, on_event))
+    
     return stage1_results
 
 
+async def _evaluate_responses_async(
+    user_query: str,
+    responses: List[Dict[str, Any]],
+    on_event: Callable[[str, Dict[str, Any]], None]
+):
+    """Evaluate model responses in the background to build quality metrics."""
+    if not responses:
+        return
+    
+    # Get evaluator model: highest rated or random from council
+    evaluator = get_highest_rated_model(exclude_models=[r["model"] for r in responses])
+    if not evaluator:
+        evaluator = get_random_model(COUNCIL_MODELS)
+    
+    if not evaluator:
+        return
+    
+    for response in responses:
+        try:
+            await _evaluate_single_response(
+                user_query, 
+                response["model"], 
+                response["response"],
+                evaluator,
+                on_event
+            )
+        except Exception as e:
+            # Don't let evaluation errors affect main flow
+            print(f"Evaluation error for {response['model']}: {e}")
+
+
+async def _evaluate_single_response(
+    user_query: str,
+    model_id: str,
+    response_text: str,
+    evaluator_model: str,
+    on_event: Callable[[str, Dict[str, Any]], None]
+):
+    """Evaluate a single response and record metrics."""
+    evaluation_prompt = f"""Evaluate the following response to a user query. 
+Rate each category from 1-5 (1=poor, 5=excellent).
+
+User Query: {user_query}
+
+Response to evaluate:
+{response_text[:2000]}  # Limit to avoid token overflow
+
+Rate the response on these categories:
+1. VERBOSITY (1=too brief/too verbose, 5=perfectly balanced)
+2. EXPERTISE (1=lacks knowledge, 5=expert-level insights)
+3. ADHERENCE (1=ignores the question, 5=directly addresses it)
+4. CLARITY (1=confusing, 5=crystal clear)
+5. OVERALL (1=poor, 5=excellent)
+
+Respond ONLY with a JSON object in this exact format:
+{{"verbosity": N, "expertise": N, "adherence": N, "clarity": N, "overall": N}}"""
+
+    messages = [{"role": "user", "content": evaluation_prompt}]
+    
+    try:
+        result = await query_model_with_retry(evaluator_model, messages, timeout=30.0)
+        if result and result.get("content"):
+            # Parse the evaluation
+            import json
+            import re
+            
+            content = result["content"]
+            # Try to extract JSON from the response
+            json_match = re.search(r'\{[^}]+\}', content)
+            if json_match:
+                scores = json.loads(json_match.group())
+                
+                # Validate and clamp scores
+                for key in ["verbosity", "expertise", "adherence", "clarity", "overall"]:
+                    if key in scores:
+                        scores[key] = max(1, min(5, int(scores[key])))
+                    else:
+                        scores[key] = 3  # Default middle score
+                
+                record_evaluation(
+                    model_id,
+                    verbosity=scores["verbosity"],
+                    expertise=scores["expertise"],
+                    adherence=scores["adherence"],
+                    clarity=scores["clarity"],
+                    overall=scores["overall"]
+                )
+                
+                on_event("model_evaluated", {
+                    "model": model_id,
+                    "evaluator": evaluator_model,
+                    "scores": scores
+                })
+    except Exception as e:
+        print(f"Failed to evaluate {model_id}: {e}")
 async def stage2_collect_rankings_streaming(
     user_query: str,
     stage1_results: List[Dict[str, Any]],
