@@ -63,9 +63,9 @@
   "response_config": {
     "response_style": "concise",
     "max_tokens": {
-      "stage1": 1024,
-      "stage2": 800,
-      "stage3": 1500
+      "stage1": null,
+      "stage2": null,
+      "stage3": null
     }
   },
   "title_generation": {
