@@ -663,6 +663,18 @@ Question: {user_query}"""
                 })
             elif chunk["type"] == "complete":
                 final_content = chunk["content"]
+                reasoning_content = chunk.get("reasoning_content", "")
+                
+                # If content is empty but reasoning has content, use reasoning
+                # (some models output everything in reasoning_content)
+                if (not final_content or not final_content.strip()) and reasoning_content and reasoning_content.strip():
+                    final_content = reasoning_content
+                    on_event("stage1_token", {
+                        "model": model,
+                        "delta": "",
+                        "content": f"[Using reasoning content as response]\n{final_content}"
+                    })
+                
                 # Check for empty/blank response
                 if not final_content or not final_content.strip():
                     if retry_count < max_retries:
@@ -1072,14 +1084,21 @@ Provide an expertly formatted final answer that represents the council's collect
                 "thinking": reasoning
             })
         elif chunk["type"] == "complete":
+            final_content = chunk["content"]
+            reasoning_content = chunk.get("reasoning_content", "")
+            
+            # If content is empty but reasoning has content, use reasoning
+            if (not final_content or not final_content.strip()) and reasoning_content and reasoning_content.strip():
+                final_content = reasoning_content
+            
             on_event("stage3_complete", {
                 "model": model_to_use,
-                "response": chunk["content"],
-                "reasoning_content": chunk.get("reasoning_content", "")
+                "response": final_content,
+                "reasoning_content": reasoning_content
             })
             return {
                 "model": model_to_use,
-                "response": chunk["content"]
+                "response": final_content
             }
         elif chunk["type"] == "error":
             on_event("stage3_error", {

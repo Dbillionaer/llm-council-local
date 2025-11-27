@@ -245,11 +245,13 @@ async def query_model_streaming(
     reasoning_buffer = ""
 
     try:
+        # For streaming, read timeout is per-chunk, not total
+        # Use longer read timeout to allow for model thinking between chunks
         timeout_config = httpx.Timeout(
             connect=connection_timeout,
-            read=timeout,
-            write=timeout,
-            pool=timeout
+            read=timeout,  # Per-chunk timeout - needs to be long for reasoning models
+            write=30.0,
+            pool=30.0
         )
         
         async with httpx.AsyncClient(timeout=timeout_config) as client:
