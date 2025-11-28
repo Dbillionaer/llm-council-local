@@ -28,7 +28,7 @@ async def run_graphiti_test():
     print("=" * 60)
     
     # Initialize MCP registry
-    print("\n[1/5] Initializing MCP servers...")
+    print("\n[1/6] Initializing MCP servers...")
     registry = get_mcp_registry()
     status = await registry.initialize()
     
@@ -42,127 +42,199 @@ async def run_graphiti_test():
     print(f"   Tools: {[t.split('.')[-1] for t in status.get('tools', []) if 'graphiti' in t]}")
     
     # Check server status
-    print("\n[2/5] Checking Graphiti server status...")
+    print("\n[2/6] Checking Graphiti server status...")
     try:
         status_result = await registry.call_tool('graphiti.get_status', {})
         print(f"   Status: {_extract_message(status_result)}")
     except Exception as e:
         print(f"   ❌ Status check failed: {e}")
+        await registry.shutdown()
+        return False
     
     # Test group ID
     test_group = "main"
-    print(f"\n[3/5] Using group '{test_group}'...")
     
-    # Add memories
-    print("\n[4/5] Adding memories...")
+    # Define test memories
     memories = [
-        "Jane likes her New Balance shoes",
-        "Jane likes her Nike shoes",
-        "Jane has Nike clothes",
-        "Jane likes Adidas shoes",
-        "Jane thinks Adidas shoes are ok but she likes the brand of shoes better that she has clothes from"
+        ("jane_preference_1", "Jane likes her New Balance shoes"),
+        ("jane_preference_2", "Jane likes her Nike shoes"),
+        ("jane_preference_3", "Jane has Nike clothes"),
+        ("jane_preference_4", "Jane likes Adidas shoes"),
+        ("jane_preference_5", "Jane thinks Adidas shoes are ok but she likes the brand of shoes better that she has clothes from")
     ]
     
-    for i, memory in enumerate(memories, 1):
-        try:
-            result = await registry.call_tool('graphiti.add_memory', {
-                'name': f'jane_preference_{i}',
-                'episode_body': memory,
-                'group_id': test_group,
-                'source': 'text',
-                'source_description': 'User preference observation'
-            })
-            msg = _extract_message(result)
-            status_icon = "⏳" if "queued" in msg.lower() else "✅"
-            print(f"   {status_icon} [{i}/5] \"{memory[:45]}...\"")
-        except Exception as e:
-            print(f"   ❌ [{i}/5] Failed: {e}")
+    # Check if memories already exist
+    print(f"\n[3/6] Checking for existing memories in group '{test_group}'...")
+    existing_nodes = []
+    try:
+        nodes_result = await registry.call_tool('graphiti.search_nodes', {
+            'query': 'Jane shoes Nike Adidas New Balance preferences',
+            'group_ids': [test_group],
+            'max_nodes': 20
+        })
+        existing_nodes = _extract_nodes(nodes_result)
+        
+        if existing_nodes:
+            print(f"   ✅ Found {len(existing_nodes)} existing nodes:")
+            for node in existing_nodes[:5]:
+                print(f"      - {node.get('name', 'unknown')}: {node.get('summary', '')[:50]}...")
+            memories_exist = True
+        else:
+            print("   ℹ️  No existing memories found - will create them")
+            memories_exist = False
+    except Exception as e:
+        print(f"   ⚠️  Could not check existing: {e}")
+        memories_exist = False
     
-    # Wait for processing
-    print("\n   Waiting for graph processing (20s)...")
-    print("   NOTE: If episodes remain 'queued', check Graphiti LLM configuration")
-    await asyncio.sleep(20)
+    # Add memories only if they don't exist
+    if not memories_exist:
+        print("\n[4/6] Adding memories...")
+        for i, (name, memory) in enumerate(memories, 1):
+            try:
+                result = await registry.call_tool('graphiti.add_memory', {
+                    'name': name,
+                    'episode_body': memory,
+                    'group_id': test_group,
+                    'source': 'text',
+                    'source_description': 'User preference observation'
+                })
+                msg = _extract_message(result)
+                status_icon = "⏳" if "queued" in msg.lower() else "✅"
+                print(f"   {status_icon} [{i}/5] \"{memory[:45]}...\"")
+            except Exception as e:
+                print(f"   ❌ [{i}/5] Failed: {e}")
+        
+        # Wait for processing
+        print("\n   Waiting for graph processing (30s)...")
+        await asyncio.sleep(30)
+    else:
+        print("\n[4/6] Skipping memory creation (already exist)")
     
-    # Check stored episodes
-    print("\n[5/5] Querying knowledge graph...")
+    # Validate memories were created
+    print("\n[5/6] Validating knowledge graph data...")
     
-    print("\n   a) Checking stored episodes...")
+    validation_passed = False
+    
+    # Check episodes
+    print("\n   a) Checking episodes...")
     try:
         episodes_result = await registry.call_tool('graphiti.get_episodes', {
             'group_ids': [test_group],
-            'max_episodes': 10
+            'max_episodes': 20
         })
         episodes = _extract_episodes(episodes_result)
         if episodes:
-            print(f"   ✅ Found {len(episodes)} episodes:")
+            print(f"   ✅ Found {len(episodes)} episodes")
             for ep in episodes[:3]:
                 print(f"      - {ep}")
         else:
-            print("   ⚠️  No episodes found (still processing or LLM not configured)")
+            print("   ⚠️  No episodes found")
     except Exception as e:
         print(f"   ❌ Get episodes failed: {e}")
     
-    # Search nodes
-    print("\n   b) Searching nodes for 'Jane shoe preferences'...")
+    # Check nodes
+    print("\n   b) Checking nodes...")
     try:
         nodes_result = await registry.call_tool('graphiti.search_nodes', {
-            'query': 'Jane shoe preferences brands Nike Adidas',
+            'query': 'Jane shoes Nike Adidas preferences brands',
             'group_ids': [test_group],
-            'max_nodes': 10
+            'max_nodes': 20
         })
         nodes = _extract_nodes(nodes_result)
         if nodes:
             print(f"   ✅ Found {len(nodes)} nodes:")
             for node in nodes[:5]:
                 print(f"      - {node.get('name', 'unknown')}: {node.get('summary', '')[:50]}...")
+            validation_passed = True
         else:
-            print("   ⚠️  No nodes found")
+            print("   ❌ No nodes found - graph not populated")
     except Exception as e:
         print(f"   ❌ Node search failed: {e}")
     
-    # Search facts
-    print("\n   c) Searching facts: 'Which shoe brand does Jane like best?'...")
+    # Check facts
+    print("\n   c) Checking facts...")
     try:
         facts_result = await registry.call_tool('graphiti.search_memory_facts', {
-            'query': 'Which shoe brand does Jane like best?',
+            'query': 'Jane likes shoes brands preferences',
             'group_ids': [test_group],
-            'max_facts': 10
+            'max_facts': 20
         })
         facts = _extract_facts(facts_result)
         if facts:
             print(f"   ✅ Found {len(facts)} facts:")
             for fact in facts[:5]:
                 print(f"      - {fact}")
+            validation_passed = True
         else:
             print("   ⚠️  No facts found")
     except Exception as e:
         print(f"   ❌ Fact search failed: {e}")
     
-    # Analysis
+    # Run final query only if validation passed
+    if not validation_passed:
+        print("\n" + "=" * 60)
+        print("❌ VALIDATION FAILED")
+        print("=" * 60)
+        print("Cannot run final query - no nodes or facts in knowledge graph.")
+        print("Check that Graphiti is properly configured with:")
+        print("  - LLM API key (OpenAI, etc.)")
+        print("  - Episode processor running")
+        print("  - Database connection working")
+        await registry.shutdown()
+        return False
+    
+    # Final query
     print("\n" + "=" * 60)
-    print("EXPECTED INFERENCE")
+    print("[6/6] FINAL QUERY: Which shoe brand does Jane like best?")
     print("=" * 60)
-    print("""
-If Graphiti is properly configured, it should infer:
-
-Input memories:
-  1. Jane likes her New Balance shoes
-  2. Jane likes her Nike shoes  
-  3. Jane has Nike clothes
-  4. Jane likes Adidas shoes
-  5. Jane prefers shoes from the brand she has clothes from
-
-Expected graph connections:
-  - Jane → likes → [New Balance, Nike, Adidas] shoes
-  - Jane → has → Nike clothes
-  - Jane → prefers → brand with clothes (Nike)
-
-Query: "Which shoe brand does Jane like best?"
-Expected answer: Nike (she has Nike clothes AND prefers that brand)
-""")
+    
+    print("\n   Searching facts for answer...")
+    try:
+        facts_result = await registry.call_tool('graphiti.search_memory_facts', {
+            'query': 'Which shoe brand does Jane like the best?',
+            'group_ids': [test_group],
+            'max_facts': 10
+        })
+        facts = _extract_facts(facts_result)
+        
+        print("\n   📊 RELEVANT FACTS:")
+        if facts:
+            for fact in facts:
+                print(f"      • {fact}")
+        else:
+            print("      (no facts returned)")
+    except Exception as e:
+        print(f"   ❌ Query failed: {e}")
+    
+    print("\n   Searching nodes for answer...")
+    try:
+        nodes_result = await registry.call_tool('graphiti.search_nodes', {
+            'query': 'Jane favorite best preferred shoe brand',
+            'group_ids': [test_group],
+            'max_nodes': 10
+        })
+        nodes = _extract_nodes(nodes_result)
+        
+        print("\n   📊 RELEVANT NODES:")
+        if nodes:
+            for node in nodes:
+                print(f"      • {node.get('name', 'unknown')}: {node.get('summary', '')[:60]}...")
+        else:
+            print("      (no nodes returned)")
+    except Exception as e:
+        print(f"   ❌ Query failed: {e}")
+    
+    # Expected answer analysis
+    print("\n" + "-" * 60)
+    print("   EXPECTED ANSWER: Nike")
+    print("   REASONING:")
+    print("      - Jane has Nike clothes")
+    print("      - Jane prefers shoes from the brand she has clothes from")
+    print("      - Therefore: Jane likes Nike shoes best")
+    print("-" * 60)
     
     await registry.shutdown()
-    print("✅ Test complete")
+    print("\n✅ Test complete")
     return True
 
 
