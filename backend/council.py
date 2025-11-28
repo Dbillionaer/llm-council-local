@@ -484,6 +484,17 @@ def _extract_json_from_response(content: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+# Keywords that strongly indicate websearch is required
+WEBSEARCH_KEYWORDS = ['news', 'current events', 'latest', 'recent', 'happening', 
+                      "today's", 'this week', 'trending', 'breaking', 'headlines']
+
+
+def _requires_websearch(query: str) -> bool:
+    """Check if query contains keywords that strongly suggest websearch is needed."""
+    query_lower = query.lower()
+    return any(keyword in query_lower for keyword in WEBSEARCH_KEYWORDS)
+
+
 async def _phase1_analyze_query(user_query: str, detailed_tool_info: str) -> Optional[Dict[str, Any]]:
     """
     Phase 1: Analyze the query to determine if MCP tools are needed.
@@ -491,17 +502,29 @@ async def _phase1_analyze_query(user_query: str, detailed_tool_info: str) -> Opt
     Returns:
         Dict with 'needs_tool', 'tool_name', 'server', 'reasoning' or None on failure
     """
+    # Fast path: if query contains news/current events keywords, short-circuit to websearch
+    if _requires_websearch(user_query):
+        print(f"[MCP Phase 1] Keywords detected, using websearch directly")
+        return {
+            "needs_tool": True,
+            "tool_name": "websearch.search",
+            "server": "websearch",
+            "reasoning": "Query about current events/news requires websearch"
+        }
+    
     # Include current date/time context so model knows the actual time
     current_time = datetime.now()
-    time_context = f"""CURRENT DATE/TIME CONTEXT:
-- Current Date: {current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A, %B %d, %Y')})
-- Current Time: {current_time.strftime('%H:%M:%S')} (local timezone)
+    time_context = f"""CRITICAL CONTEXT - READ CAREFULLY:
+- Today's date is: {current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A, %B %d, %Y')})
+- Current time: {current_time.strftime('%H:%M:%S')} (local timezone)
 - Year: {current_time.year}
 
-IMPORTANT: Use this current date/time information when determining if tools are needed.
-For any query about "today", "current", "now", "this week", "recent news", etc., you should use the system-date-time tool to get accurate time information, and/or websearch for current events."""
+IMPORTANT: You HAVE ACCESS to external tools including websearch!
+- Do NOT say you "lack real-time access" or "cannot access current information"
+- For ANY question about news, current events, or real-time information → USE websearch.search
+- For date/time questions → USE system-date-time.get-system-date-time"""
 
-    analysis_prompt = f"""You are an intelligent assistant that analyzes user queries to determine if external tools are needed.
+    analysis_prompt = f"""You are a tool router that decides which MCP tool to use for a query.
 
 {time_context}
 
@@ -509,23 +532,18 @@ For any query about "today", "current", "now", "this week", "recent news", etc.,
 
 USER QUERY: {user_query}
 
-TASK: Analyze if any of the available MCP tools would help answer this query accurately.
+DECISION RULES (follow strictly):
+1. News/current events/what's happening → websearch.search (ALWAYS)
+2. Math calculations → calculator tools
+3. Date/time questions → system-date-time.get-system-date-time
+4. Location questions → system-geo-location.get-system-geo-location
+5. Factual questions (capitals, definitions) → no tool needed
 
-Consider:
-1. Does the query require real-time data (current time, web search, live info)?
-2. Does the query require computation (math calculations)?
-3. Can the query be answered better with tool assistance?
-4. For questions about "today's news", "current events", "what's happening now" - ALWAYS use websearch tool
-5. For questions about current date/time - use system-date-time tool
+Respond with ONLY a JSON object:
+- Tool needed: {{"needs_tool": true, "tool_name": "server.tool_name", "server": "server_name", "reasoning": "brief"}}
+- No tool: {{"needs_tool": false, "reasoning": "brief"}}
 
-Respond with a JSON object:
-- If a tool IS needed:
-{{"needs_tool": true, "tool_name": "server.tool_name", "server": "server_name", "reasoning": "brief explanation"}}
-
-- If NO tool is needed:
-{{"needs_tool": false, "reasoning": "brief explanation"}}
-
-Output ONLY valid JSON. No other text."""
+JSON response:"""
 
     messages = [{"role": "user", "content": analysis_prompt}]
     tool_model = get_tool_calling_model()
