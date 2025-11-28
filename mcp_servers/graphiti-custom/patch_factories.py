@@ -31,7 +31,7 @@ if "HAS_LMSTUDIO" not in content:
         pattern = r"(from utils\.utils import create_azure_credential_token_provider)"
         content = re.sub(pattern, r"\1" + import_addition, content)
 
-# Add the lmstudio case to the match statement
+# Add the lmstudio case to the LLM match statement
 lmstudio_case = '''
             case 'lmstudio':
                 # For LM Studio with strict JSON schema support
@@ -52,16 +52,47 @@ lmstudio_case = '''
                 return LMStudioClient(config=llm_config, max_tokens=config.max_tokens or 16384)
 '''
 
-# Insert before "case _:" (default case)
+# Insert before "case _:" (default case) in LLMFactory
 if "'lmstudio'" not in content:
     content = re.sub(
         r"(\n            case _:)",
         lmstudio_case + r"\1",
-        content
+        content,
+        count=1  # Only the first match (LLMFactory)
     )
+
+# Add openai_generic case to EmbedderFactory for LM Studio embeddings
+openai_generic_embedder_case = '''            case 'openai_generic':
+                # OpenAI-compatible embedder with custom base URL (e.g., LM Studio)
+                import os
+                api_key = os.environ.get('EMBEDDER_API_KEY', 'lms')
+                base_url = os.environ.get('EMBEDDER_BASE_URL', 'http://localhost:1234/v1')
+                
+                from graphiti_core.embedder.openai import OpenAIEmbedderConfig
+                
+                # Get embedding dimension from environment or use default
+                embedding_dim = int(os.environ.get('EMBEDDER_DIM', '768'))
+                
+                logger.info(f'Creating OpenAI-generic embedder with base_url: {base_url}, model: {config.model}, dim: {embedding_dim}')
+                embedder_config = OpenAIEmbedderConfig(
+                    api_key=api_key,
+                    base_url=base_url,
+                    embedding_model=config.model,
+                    embedding_dim=embedding_dim,
+                )
+                return OpenAIEmbedder(config=embedder_config)
+
+'''
+
+# Find the case 'voyage' in EmbedderFactory and add our case after it
+if "'openai_generic'" not in content:
+    # Find the voyage case and its return statement, then add after
+    pattern = r"(return VoyageAIEmbedder\(config=voyage_config\))\n\n(            case _:)"
+    replacement = r"\1\n\n" + openai_generic_embedder_case + r"\2"
+    content = re.sub(pattern, replacement, content)
 
 # Write back
 with open(FACTORIES_PATH, "w") as f:
     f.write(content)
 
-print("Successfully patched factories.py")
+print("Successfully patched factories.py with LMStudio LLM and openai_generic embedder support")

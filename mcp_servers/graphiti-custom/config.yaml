@@ -17,13 +17,10 @@ llm:
       api_key: "lms"
       api_url: "http://192.168.1.111:11434/v1"
 
-# Embedder Configuration - Using OpenAI for embeddings
+# Embedder Configuration - Using LM Studio with nomic-embed
 embedder:
-  provider: openai
-  model: text-embedding-3-small
-  providers:
-    openai:
-      api_key: "${OPENAI_API_KEY}"
+  provider: openai_generic
+  model: text-embedding-nomic-embed-text-v1.5@f16
 
 # Database Configuration - FalkorDB
 database:

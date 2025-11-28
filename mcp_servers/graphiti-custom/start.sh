@@ -7,6 +7,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CONTAINER_NAME="llm-council-mcp"
 IMAGE_NAME="graphiti-custom"
 
+# LM Studio server URL
+LM_STUDIO_URL="http://192.168.1.111:11434/v1"
+
 echo "🚀 Starting Graphiti Custom MCP Server..."
 echo ""
 
@@ -33,7 +36,11 @@ echo "🐳 Starting container: $CONTAINER_NAME..."
 docker run -d \
     --name "$CONTAINER_NAME" \
     -p 8000:8000 \
-    -e OPENAI_API_KEY="${OPENAI_API_KEY:-sk-dummy}" \
+    -e OPENAI_API_KEY="lms" \
+    -e OPENAI_BASE_URL="$LM_STUDIO_URL" \
+    -e EMBEDDER_API_KEY="lms" \
+    -e EMBEDDER_BASE_URL="$LM_STUDIO_URL" \
+    -e EMBEDDER_DIM="768" \
     --restart unless-stopped \
     "$IMAGE_NAME"
 
@@ -52,7 +59,8 @@ if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
     echo "✅ Graphiti MCP Server is running!"
     echo "   Container: $CONTAINER_NAME"
     echo "   MCP Endpoint: http://localhost:8000/mcp/"
-    echo "   LLM: qwen2.5-14b-instruct @ http://192.168.1.111:11434/v1"
+    echo "   LLM: qwen2.5-14b-instruct @ $LM_STUDIO_URL"
+    echo "   Embedder: text-embedding-nomic-embed-text-v1.5 @ $LM_STUDIO_URL"
     echo "   Database: FalkorDB @ redis://192.168.1.111:6379"
     echo ""
     echo "📋 View logs: docker logs -f $CONTAINER_NAME"
