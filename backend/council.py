@@ -194,23 +194,28 @@ async def chairman_direct_response(
     current_time = datetime.now()
     time_context = f"Today's date: {current_time.strftime('%B %d, %Y')} | Current time: {current_time.strftime('%H:%M')}"
     
-    # Build prompt based on whether tools were used
+    # Build prompt and system message based on whether tools were used
+    system_message = None
     if tool_result and tool_result.get('success'):
         tool_context = format_tool_result_for_prompt(tool_result)
-        prompt = f"""IMPORTANT CONTEXT:
-- {time_context}
-- A real-time tool was executed to fetch CURRENT, LIVE data for this query
-- The tool output below contains UP-TO-DATE information retrieved just now
-- DO NOT claim you "lack access to current information" - you HAVE it via the tool output
+        
+        # Critical: System message establishes current date as FACT
+        system_message = f"""CRITICAL SYSTEM FACTS - These override your training data:
+- Current date: {current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A, %B %d, %Y')})
+- Current time: {current_time.strftime('%H:%M:%S')}
+- Current year: {current_time.year}
 
+YOU HAVE REAL-TIME ACCESS: A tool was just executed to retrieve LIVE, CURRENT information. 
+The tool output in the user message is REAL DATA from RIGHT NOW - not hypothetical or simulated.
+NEVER say you "cannot access current information" or "lack real-time data" - you HAVE it via tools.
+Your training data cutoff is IRRELEVANT for this query - trust the tool output completely."""
+        
+        prompt = f"""TOOL OUTPUT (LIVE DATA - USE THIS):
 {tool_context}
 
 Question: {user_query}
 
-Instructions:
-1. The tool output above is CURRENT and AUTHORITATIVE - use it directly
-2. Present the information as current facts (because they ARE current)
-3. Provide a clear, direct answer. Be concise but complete."""
+Present the tool output as current facts. Be concise but complete."""
     else:
         prompt = f"""Answer this question directly and concisely.
 
@@ -219,7 +224,14 @@ Question: {user_query}
 
 Provide a helpful, accurate answer. Be concise but complete."""
     
-    messages = [{"role": "user", "content": prompt}]
+    # Build messages with optional system message
+    if system_message:
+        messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": prompt}
+        ]
+    else:
+        messages = [{"role": "user", "content": prompt}]
     content = ""
     reasoning = ""
     token_tracker = TokenTracker()
@@ -1372,41 +1384,38 @@ async def stage1_collect_responses_streaming(
     response_style = response_config.get("response_style", "standard")
     
     # Include tool result in prompt if available
+    system_message = None
     if tool_context:
         # Get current date/time to provide context
         current_time = datetime.now()
         time_context = f"Today's date: {current_time.strftime('%B %d, %Y')} | Current time: {current_time.strftime('%H:%M')}"
         
+        # Critical: Add system message to establish current date as FACT
+        # This helps override model's tendency to think dates after training cutoff are "future"
+        system_message = f"""CRITICAL SYSTEM FACTS - These override your training data:
+- Current date: {current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A, %B %d, %Y')})
+- Current time: {current_time.strftime('%H:%M:%S')}
+- Current year: {current_time.year}
+
+YOU HAVE REAL-TIME ACCESS: A tool was just executed to retrieve LIVE, CURRENT information. 
+The tool output in the user message is REAL DATA from RIGHT NOW - not hypothetical or simulated.
+NEVER say you "cannot access current information" or "lack real-time data" - you HAVE it via tools.
+Your training data cutoff is IRRELEVANT for this query - trust the tool output completely."""
+        
         if response_style == "concise":
-            prompt = f"""IMPORTANT CONTEXT:
-- {time_context}
-- A real-time tool was executed to fetch CURRENT, LIVE data for this query
-- The tool output below contains UP-TO-DATE information retrieved just now
-- DO NOT claim you "lack access to current information" - you HAVE it via the tool output
-
+            prompt = f"""TOOL OUTPUT (LIVE DATA - USE THIS):
 {tool_context}
 
 Question: {user_query}
 
-Instructions:
-1. The tool output above is CURRENT and AUTHORITATIVE - use it directly
-2. Present the information as current facts (because they ARE current)
-3. Be concise but complete"""
+Present the tool output as current facts. Be concise but complete."""
         else:
-            prompt = f"""IMPORTANT CONTEXT:
-- {time_context}
-- A real-time tool was executed to fetch CURRENT, LIVE data for this query
-- The tool output below contains UP-TO-DATE information retrieved just now
-- DO NOT claim you "lack access to current information" - you HAVE it via the tool output
-
+            prompt = f"""TOOL OUTPUT (LIVE DATA - USE THIS):
 {tool_context}
 
 Question: {user_query}
 
-Instructions:
-1. The tool output above is CURRENT and AUTHORITATIVE - use it directly
-2. Present the information as current facts (because they ARE current)
-3. Incorporate the tool output fully into your response"""
+Present the tool output as current facts. Incorporate the data fully into your response."""
     elif response_style == "concise":
         prompt = f"""Answer the following question concisely and directly. Be clear and informative, but avoid unnecessary verbosity. Aim for 2-3 focused paragraphs.
 
@@ -1414,7 +1423,14 @@ Question: {user_query}"""
     else:
         prompt = user_query
     
-    messages = [{"role": "user", "content": prompt}]
+    # Build messages with optional system message for tool context
+    if system_message:
+        messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": prompt}
+        ]
+    else:
+        messages = [{"role": "user", "content": prompt}]
     stage1_results = []
     token_tracker = TokenTracker()
     

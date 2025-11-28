@@ -5,7 +5,69 @@ import sys
 import json
 import urllib.request
 import urllib.parse
-from typing import Dict, Any
+import re
+from typing import Dict, Any, List
+
+
+def parse_html_results(html: str, max_results: int = 5) -> List[Dict[str, str]]:
+    """
+    Parse search results from SearXNG HTML response.
+    
+    Args:
+        html: Raw HTML response from SearXNG
+        max_results: Maximum number of results to return
+    
+    Returns:
+        List of result dicts with title, url, and snippet
+    """
+    results = []
+    
+    # Pattern to find result articles/divs
+    # SearXNG uses <article class="result"> for each result
+    result_pattern = re.compile(
+        r'<article[^>]*class="[^"]*result[^"]*"[^>]*>.*?</article>',
+        re.DOTALL | re.IGNORECASE
+    )
+    
+    # Patterns to extract title, url, and snippet from each result
+    # Title is in <h3><a href="...">Title text with <span class="highlight">words</span></a></h3>
+    title_pattern = re.compile(r'<h3[^>]*>\s*<a[^>]*>(.+?)</a>\s*</h3>', re.DOTALL | re.IGNORECASE)
+    url_pattern = re.compile(r'<h3[^>]*>\s*<a[^>]*href="([^"]+)"', re.DOTALL | re.IGNORECASE)
+    snippet_pattern = re.compile(r'<p[^>]*class="[^"]*content[^"]*"[^>]*>(.*?)</p>', re.DOTALL | re.IGNORECASE)
+    
+    # Find all result blocks
+    result_blocks = result_pattern.findall(html)
+    
+    for block in result_blocks[:max_results]:
+        result = {}
+        
+        # Extract URL (from h3 > a href)
+        url_match = url_pattern.search(block)
+        if url_match:
+            result['url'] = url_match.group(1)
+        
+        # Extract title (from h3 > a content, strip HTML tags)
+        title_match = title_pattern.search(block)
+        if title_match:
+            title_html = title_match.group(1)
+            # Remove HTML tags (like <span class="highlight">)
+            title = re.sub(r'<[^>]+>', '', title_html).strip()
+            result['title'] = title
+        
+        # Extract snippet/content (strip HTML tags)
+        snippet_match = snippet_pattern.search(block)
+        if snippet_match:
+            snippet_html = snippet_match.group(1)
+            # Remove HTML tags and clean up
+            snippet = re.sub(r'<[^>]+>', '', snippet_html).strip()
+            # Normalize whitespace
+            snippet = re.sub(r'\s+', ' ', snippet)
+            result['snippet'] = snippet
+        
+        if result.get('title') or result.get('url'):
+            results.append(result)
+    
+    return results
 
 
 def search(query: str, max_results: int = 5) -> Dict[str, Any]:
@@ -19,15 +81,18 @@ def search(query: str, max_results: int = 5) -> Dict[str, Any]:
     Returns:
         Search results dict with query, results list, and metadata
     """
-    # URL encode the query
-    encoded_query = urllib.parse.quote(query)
-    url = f'http://127.0.0.1:8080?q="{encoded_query}"'
+    # Replace spaces with + for URL, then URL encode other special characters
+    # This matches SearXNG expected format: /search?q=searxng+mcp+server
+    query_with_plus = query.replace(' ', '+')
+    # URL encode remaining special characters (but not +)
+    encoded_query = urllib.parse.quote(query_with_plus, safe='+')
+    url = f'http://127.0.0.1:8080/search?q={encoded_query}'
     
     try:
         with urllib.request.urlopen(url, timeout=30) as response:
             content = response.read().decode('utf-8')
             
-            # Try to parse as JSON
+            # Try to parse as JSON first (in case SearXNG is configured for JSON)
             try:
                 data = json.loads(content)
                 return {
@@ -37,13 +102,24 @@ def search(query: str, max_results: int = 5) -> Dict[str, Any]:
                     "source": "local_search"
                 }
             except json.JSONDecodeError:
-                # Return raw text if not JSON
-                return {
-                    "success": True,
-                    "query": query,
-                    "results": [{"text": content[:2000]}],  # Limit length
-                    "source": "local_search"
-                }
+                # Parse HTML response from SearXNG
+                results = parse_html_results(content, max_results)
+                if results:
+                    return {
+                        "success": True,
+                        "query": query,
+                        "results": results,
+                        "source": "local_search"
+                    }
+                else:
+                    # No results found
+                    return {
+                        "success": True,
+                        "query": query,
+                        "results": [],
+                        "message": "No search results found",
+                        "source": "local_search"
+                    }
                 
     except urllib.error.URLError as e:
         return {

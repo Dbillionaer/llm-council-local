@@ -655,16 +655,20 @@ function App() {
     }));
     
     // Re-run the council without adding a new user message
+    // truncateAt=messageIndex tells backend to keep messages up to this index (inclusive)
+    // skipUserMessage=true tells backend not to add a new user message
     setIsLoading(true);
     try {
-      await runCouncilForMessage(userMessage.content);
+      await runCouncilForMessage(userMessage.content, { truncateAt: messageIndex, skipUserMessage: true });
     } catch (error) {
       console.error('Failed to redo message:', error);
       setIsLoading(false);
     }
   };
 
-  const runCouncilForMessage = async (content) => {
+  const runCouncilForMessage = async (content, options = {}) => {
+    const { truncateAt = null, skipUserMessage = false } = options;
+    
     // Create a partial assistant message that will be updated progressively
     const assistantMessage = {
       role: 'assistant',
@@ -691,6 +695,7 @@ function App() {
     }));
 
     // Send message with token-level streaming
+    // Pass truncateAt and skipUserMessage for re-run scenarios
     await api.sendMessageStreamTokens(currentConversationId, content, (eventType, event) => {
       switch (eventType) {
         case 'classification_start':
@@ -1070,7 +1075,7 @@ function App() {
           setIsLoading(false);
           break;
       }
-    });
+    }, truncateAt, skipUserMessage);
   };
 
   const handleEditMessage = async (messageIndex, newContent) => {
@@ -1083,10 +1088,12 @@ function App() {
       return { ...prev, messages };
     });
     
-    // Re-run the council with the edited message (without adding another user message)
+    // Re-run the council with the edited message
+    // truncateAt=messageIndex-1 tells backend to remove the old user message and everything after
+    // Then backend will add the new user message
     setIsLoading(true);
     try {
-      await runCouncilForMessage(newContent);
+      await runCouncilForMessage(newContent, { truncateAt: messageIndex - 1 });
     } catch (error) {
       console.error('Failed to edit message:', error);
       setIsLoading(false);

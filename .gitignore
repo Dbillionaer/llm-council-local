@@ -23,6 +23,9 @@ frontend/.vite/
 # Temp files
 tmp/
 
+# Test results (keep test code, exclude results)
+tests/results/
+
 # Local tracking files (not synced to repo)
 TODO.md
 CHANGELOG.md

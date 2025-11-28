@@ -120,7 +120,15 @@ export const api = {
    * @param {function} onEvent - Callback function for each event: (eventType, data) => void
    * @returns {Promise<void>}
    */
-  async sendMessageStreamTokens(conversationId, content, onEvent) {
+  async sendMessageStreamTokens(conversationId, content, onEvent, truncateAt = null, skipUserMessage = false) {
+    const body = { content };
+    if (truncateAt !== null) {
+      body.truncate_at = truncateAt;
+    }
+    if (skipUserMessage) {
+      body.skip_user_message = true;
+    }
+    
     const response = await fetch(
       `${API_BASE}/api/conversations/${conversationId}/message/stream-tokens`,
       {
@@ -128,7 +136,7 @@ export const api = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(body),
       }
     );
 

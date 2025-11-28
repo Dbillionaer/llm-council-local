@@ -4,7 +4,7 @@ from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from contextlib import asynccontextmanager
 import uuid
 import json
@@ -113,6 +113,8 @@ class CreateConversationRequest(BaseModel):
 class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
     content: str
+    truncate_at: Optional[int] = None  # Index to truncate messages before re-run
+    skip_user_message: bool = False  # Skip adding user message (for re-runs)
 
 
 class ConversationMetadata(BaseModel):
@@ -363,14 +365,21 @@ async def send_message_stream_tokens(conversation_id: str, request: SendMessageR
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
+    # Handle message truncation for re-runs
+    if request.truncate_at is not None:
+        # Truncate messages to keep only messages up to and including truncate_at index
+        conversation["messages"] = conversation["messages"][:request.truncate_at + 1]
+        storage.save_conversation(conversation)
+
     # Check if this is the first message and conversation has generic title
     is_first_message = len(conversation["messages"]) == 0
     current_title = conversation.get("title", "").strip()
 
     async def token_event_generator():
         try:
-            # Add user message
-            storage.add_user_message(conversation_id, request.content)
+            # Add user message (unless skipping for re-runs where user message already exists)
+            if not request.skip_user_message:
+                storage.add_user_message(conversation_id, request.content)
 
             # Generate title first if needed
             if is_first_message and current_title.startswith("Conversation "):

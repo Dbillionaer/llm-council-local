@@ -524,6 +524,74 @@ Get ranked model list:
 curl http://localhost:8001/api/metrics/ranking | jq
 ```
 
+## Automated Testing
+
+The project includes a flexible automated testing framework for validating functionality.
+
+### Running Tests
+
+The test runner automatically starts and stops the server. No manual server management needed.
+
+```bash
+# Run all tests (auto-manages server)
+uv run -m tests.test_runner
+
+# Run specific scenario
+uv run -m tests.test_runner --scenario current_news_websearch
+
+# Filter by tags
+uv run -m tests.test_runner --tags mcp,websearch
+
+# Run with fix iterations (for CI/CD)
+uv run -m tests.test_runner --max-iterations 3
+
+# Use custom scenarios file
+uv run -m tests.test_runner --scenarios-file tests/scenarios.json
+
+# Disable auto-server (use existing running server)
+uv run -m tests.test_runner --no-auto-server
+```
+
+### Test Scenarios
+
+Tests are defined in `tests/scenarios.json` with the following structure:
+
+```json
+{
+  "name": "current_news_websearch",
+  "query": "What are today's top 5 news headlines?",
+  "expected_behavior": {
+    "tool_used": "websearch.search",
+    "no_refusal": true,
+    "has_content": true,
+    "min_length": 100
+  },
+  "tags": ["mcp", "websearch", "current-events"]
+}
+```
+
+**Expected Behavior Checks:**
+- `tool_used`: Verify specific MCP tool was invoked
+- `response_type`: Check if `direct` or `deliberation`
+- `contains`: List of substrings that must appear in response
+- `not_contains`: List of forbidden substrings
+- `no_refusal`: Ensure no "I cannot access" style refusals
+- `has_content`: Check minimum response length
+- `min_length`: Specific character minimum
+
+### Test Results
+
+Results are saved to `tmp/test_results/` with timestamps. Each run generates:
+- JSON file with detailed results per test
+- Console report with pass/fail summary
+- Diagnostic info for debugging failures
+
+### Adding Custom Tests
+
+1. Edit `tests/scenarios.json` to add scenarios
+2. Use tags to organize tests by feature area
+3. Run with `--tags your-tag` to test specific areas
+
 ## Tech Stack
 
 - **Backend:** FastAPI (Python 3.10+), async httpx, LM Studio API, multi-round deliberation, background title generation, conversation management, dynamic configuration
