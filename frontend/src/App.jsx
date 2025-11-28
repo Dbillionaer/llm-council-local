@@ -288,6 +288,75 @@ function App() {
             });
             break;
 
+          case 'formatter_start':
+            // Formatter model starting to improve response
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.formatterActive = true;
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'formatter_token':
+            // Streaming token from formatter
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              if (!lastMsg.streaming) lastMsg.streaming = { stage1: {}, stage2: {}, stage3: {} };
+              lastMsg.streaming.stage3 = {
+                ...(lastMsg.streaming.stage3 || {}),
+                content: event.content,
+                isStreaming: true,
+                tokensPerSecond: event.tokens_per_second,
+                thinkingSeconds: event.thinking_seconds,
+                elapsedSeconds: event.elapsed_seconds,
+                isFormatter: true,
+              };
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'formatter_thinking':
+            // Thinking from formatter
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              if (!lastMsg.streaming) lastMsg.streaming = { stage1: {}, stage2: {}, stage3: {} };
+              lastMsg.streaming.stage3 = {
+                ...(lastMsg.streaming.stage3 || {}),
+                thinking: event.thinking,
+                isStreaming: true,
+                tokensPerSecond: event.tokens_per_second,
+                thinkingSeconds: event.thinking_seconds,
+                elapsedSeconds: event.elapsed_seconds,
+                isFormatter: true,
+              };
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'formatter_complete':
+            // Formatter complete - update final response
+            setCurrentConversation((prev) => {
+              const messages = [...prev.messages];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.stage3 = { ...lastMsg.stage3, response: event.response, model: event.model };
+              lastMsg.formatterActive = false;
+              lastMsg.loading.stage3 = false;
+              if (lastMsg.classification) {
+                lastMsg.classification.status = 'complete';
+              }
+              if (lastMsg.streaming?.stage3) {
+                lastMsg.streaming.stage3.isStreaming = false;
+                lastMsg.streaming.stage3.tokensPerSecond = event.tokens_per_second;
+                lastMsg.streaming.stage3.thinkingSeconds = event.thinking_seconds;
+                lastMsg.streaming.stage3.elapsedSeconds = event.elapsed_seconds;
+              }
+              return { ...prev, messages };
+            });
+            break;
+
           case 'deliberation_start':
             // Full deliberation path
             setCurrentConversation((prev) => {
@@ -693,6 +762,71 @@ function App() {
             lastMsg.stage3 = event.data;
             lastMsg.loading.stage3 = false;
             // Update classification status to complete
+            if (lastMsg.classification) {
+              lastMsg.classification.status = 'complete';
+            }
+            if (lastMsg.streaming?.stage3) {
+              lastMsg.streaming.stage3.isStreaming = false;
+              lastMsg.streaming.stage3.tokensPerSecond = event.tokens_per_second;
+              lastMsg.streaming.stage3.thinkingSeconds = event.thinking_seconds;
+              lastMsg.streaming.stage3.elapsedSeconds = event.elapsed_seconds;
+            }
+            return { ...prev, messages };
+          });
+          break;
+
+        case 'formatter_start':
+          setCurrentConversation((prev) => {
+            const messages = [...prev.messages];
+            const lastMsg = messages[messages.length - 1];
+            lastMsg.formatterActive = true;
+            return { ...prev, messages };
+          });
+          break;
+
+        case 'formatter_token':
+          setCurrentConversation((prev) => {
+            const messages = [...prev.messages];
+            const lastMsg = messages[messages.length - 1];
+            if (!lastMsg.streaming) lastMsg.streaming = { stage1: {}, stage2: {}, stage3: {} };
+            lastMsg.streaming.stage3 = {
+              ...(lastMsg.streaming.stage3 || {}),
+              content: event.content,
+              isStreaming: true,
+              tokensPerSecond: event.tokens_per_second,
+              thinkingSeconds: event.thinking_seconds,
+              elapsedSeconds: event.elapsed_seconds,
+              isFormatter: true,
+            };
+            return { ...prev, messages };
+          });
+          break;
+
+        case 'formatter_thinking':
+          setCurrentConversation((prev) => {
+            const messages = [...prev.messages];
+            const lastMsg = messages[messages.length - 1];
+            if (!lastMsg.streaming) lastMsg.streaming = { stage1: {}, stage2: {}, stage3: {} };
+            lastMsg.streaming.stage3 = {
+              ...(lastMsg.streaming.stage3 || {}),
+              thinking: event.thinking,
+              isStreaming: true,
+              tokensPerSecond: event.tokens_per_second,
+              thinkingSeconds: event.thinking_seconds,
+              elapsedSeconds: event.elapsed_seconds,
+              isFormatter: true,
+            };
+            return { ...prev, messages };
+          });
+          break;
+
+        case 'formatter_complete':
+          setCurrentConversation((prev) => {
+            const messages = [...prev.messages];
+            const lastMsg = messages[messages.length - 1];
+            lastMsg.stage3 = { ...lastMsg.stage3, response: event.response, model: event.model };
+            lastMsg.formatterActive = false;
+            lastMsg.loading.stage3 = false;
             if (lastMsg.classification) {
               lastMsg.classification.status = 'complete';
             }

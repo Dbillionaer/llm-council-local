@@ -97,6 +97,7 @@ async def chairman_direct_response(
     """
     Generate a direct response from the chairman without council deliberation.
     Used for factual questions and casual chat.
+    If a formatter model is configured and different from chairman, it formats the final response.
     
     Args:
         user_query: The user's question
@@ -163,17 +164,30 @@ Provide a helpful, accurate answer. Be concise but complete."""
                     **timing
                 })
         elif chunk["type"] == "complete":
-            final_content = chunk["content"]
+            chairman_content = chunk["content"]
             if on_event:
                 on_event("direct_response_complete", {
                     "model": CHAIRMAN_MODEL,
-                    "response": final_content,
+                    "response": chairman_content,
                     "tokens_per_second": token_tracker.get_final_tps(CHAIRMAN_MODEL),
                     **token_tracker.get_final_timing(CHAIRMAN_MODEL)
                 })
+            
+            # Apply formatter if configured and different from chairman
+            if FORMATTER_MODEL and FORMATTER_MODEL != CHAIRMAN_MODEL:
+                formatted_content = await _apply_formatter(
+                    chairman_content, user_query, on_event, token_tracker
+                )
+                return {
+                    "model": FORMATTER_MODEL,
+                    "response": formatted_content,
+                    "type": "direct",
+                    "chairman_model": CHAIRMAN_MODEL
+                }
+            
             return {
                 "model": CHAIRMAN_MODEL,
-                "response": final_content,
+                "response": chairman_content,
                 "type": "direct"
             }
         elif chunk["type"] == "error":
@@ -193,6 +207,91 @@ Provide a helpful, accurate answer. Be concise but complete."""
         "response": content if content else "Error generating response.",
         "type": "direct"
     }
+
+
+async def _apply_formatter(
+    content: str,
+    original_query: str,
+    on_event: Optional[Callable],
+    token_tracker: TokenTracker
+) -> str:
+    """
+    Apply the formatter model to improve response formatting.
+    
+    Args:
+        content: The chairman's response to format
+        original_query: The user's original question
+        on_event: Optional callback for streaming events
+        token_tracker: Token tracker for metrics
+        
+    Returns:
+        Formatted response string
+    """
+    formatter_prompt = f"""You are a response formatter. Your job is to improve the formatting and readability of the following response without changing its meaning or content.
+
+Original question: {original_query}
+
+Response to format:
+{content}
+
+Improve the formatting by:
+- Using clear paragraphs and structure
+- Adding bullet points or numbered lists where appropriate
+- Using bold/italic for emphasis where helpful
+- Ensuring proper markdown formatting
+- Keeping the content accurate and complete
+
+Return ONLY the formatted response, nothing else."""
+
+    messages = [{"role": "user", "content": formatter_prompt}]
+    formatted_content = ""
+    
+    if on_event:
+        on_event("formatter_start", {"model": FORMATTER_MODEL})
+    
+    async for chunk in query_model_streaming(FORMATTER_MODEL, messages):
+        if chunk["type"] == "token":
+            formatted_content = chunk["content"]
+            tps = token_tracker.record_token(FORMATTER_MODEL, chunk["delta"])
+            timing = token_tracker.get_timing(FORMATTER_MODEL)
+            if on_event:
+                on_event("formatter_token", {
+                    "model": FORMATTER_MODEL,
+                    "delta": chunk["delta"],
+                    "content": formatted_content,
+                    "tokens_per_second": tps,
+                    **timing
+                })
+        elif chunk["type"] == "thinking":
+            tps = token_tracker.record_thinking(FORMATTER_MODEL, chunk["delta"])
+            timing = token_tracker.get_timing(FORMATTER_MODEL)
+            if on_event:
+                on_event("formatter_thinking", {
+                    "model": FORMATTER_MODEL,
+                    "delta": chunk["delta"],
+                    "thinking": chunk["content"],
+                    "tokens_per_second": tps,
+                    **timing
+                })
+        elif chunk["type"] == "complete":
+            formatted_content = chunk["content"]
+            if on_event:
+                on_event("formatter_complete", {
+                    "model": FORMATTER_MODEL,
+                    "response": formatted_content,
+                    "tokens_per_second": token_tracker.get_final_tps(FORMATTER_MODEL),
+                    **token_tracker.get_final_timing(FORMATTER_MODEL)
+                })
+        elif chunk["type"] == "error":
+            if on_event:
+                on_event("formatter_error", {
+                    "model": FORMATTER_MODEL,
+                    "error": chunk["error"]
+                })
+            # Fall back to original content on error
+            return content
+    
+    return formatted_content if formatted_content else content
 
 
 # ============== Token Tracking ==============

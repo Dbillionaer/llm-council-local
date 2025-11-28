@@ -17,7 +17,13 @@ In a bit more detail, here is what happens when you submit a query:
 
 ## Key Features
 
-### Current Release (v0.12.0)
+### Current Release (v0.14.0)
+- **Formatter Model for Direct Responses**: Two-step response generation
+  - Chairman generates initial response content
+  - Configurable formatter model improves formatting and readability
+  - Falls back to chairman if formatter not configured
+
+### Previous Release (v0.12.0)
 - **MCP Status Indicator**: Visual MCP server status in sidebar header
   - "MCP" badge next to "LLM Council" title with blue/grey styling
   - Hover overlay showing all MCP servers with status indicators

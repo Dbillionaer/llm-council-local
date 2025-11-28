@@ -45,9 +45,9 @@
       "api_key": ""
     },
     "formatter": {
-      "id": "",
-      "name": "",
-      "description": "Optional formatter model for final answer (empty = use chairman)",
+      "id": "qwen/qwen3-4b-thinking-2507",
+      "name": "Qwen3-4B Thinking",
+      "description": "Formatter model for improving response formatting (empty = use chairman)",
       "ip": "",
       "port": "",
       "base_url_template": "",
@@ -98,8 +98,8 @@
     "connection_timeout": 30
   },
   "metadata": {
-    "version": "2.4",
-    "updated": "2025-11-27T12:15:00.000Z",
-    "changes": "Added websearch MCP server for web search capability"
+    "version": "2.5",
+    "updated": "2025-11-28T05:21:00.000Z",
+    "changes": "Added formatter model for two-step direct response generation"
   }
 }
