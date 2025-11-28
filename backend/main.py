@@ -240,9 +240,8 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
 
     # If this is the first message and has generic title, trigger immediate title generation
     if is_first_message and current_title.startswith("Conversation "):
-        title_service = get_title_service()
         # Run in background without blocking the council process
-        asyncio.create_task(title_service.generate_title_immediate(conversation_id, request.content))
+        asyncio.create_task(title_service.generate_title(conversation_id, request.content))
 
     # Run the 3-stage council process
     stage1_results, stage2_results, stage3_result, metadata = await run_full_council(
