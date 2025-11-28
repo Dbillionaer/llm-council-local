@@ -17,7 +17,20 @@ In a bit more detail, here is what happens when you submit a query:
 
 ## Key Features
 
-### Current Release (v0.14.0)
+### Current Release (v0.16.0)
+- **Intelligent Prompt Engineering**: Dynamic prompt generation system
+  - `prompt_engineer` model config (defaults to chairman if not specified)
+  - Prompt library (`data/prompt_library.json`, `data/prompt_library.md`) for caching proven prompts
+  - Automatic prompt generation for tool output extraction based on query type
+  - Category-based prompt matching (news, weather, location, datetime, etc.)
+  - Success rate tracking for prompt optimization over time
+
+### Previous Release (v0.15.7)
+- **Websearch POST Fix**: SearXNG now queried via POST instead of GET for proper results
+- **Classification Improvements**: Better `requires_tools` detection for geolocation, weather, and news queries
+- **Result Interpretation**: Improved guidance for extracting actual content from search snippets
+
+### Previous Release (v0.14.0)
 - **Formatter Model for Direct Responses**: Two-step response generation
   - Chairman generates initial response content
   - Configurable formatter model improves formatting and readability
@@ -248,6 +261,15 @@ The application automatically detects your local IP and validates model availabi
       "id": "qwen/qwen3-4b-thinking-2507",
       "name": "Qwen3-4B Thinking",
       "description": "Qwen's 4B thinking model for synthesis",
+      "ip": "",
+      "port": "",
+      "base_url_template": "",
+      "api_key": ""
+    },
+    "prompt_engineer": {
+      "id": "",
+      "name": "Prompt Engineer",
+      "description": "Dynamic prompt generation (empty = use chairman)",
       "ip": "",
       "port": "",
       "base_url_template": "",

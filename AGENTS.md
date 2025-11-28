@@ -69,7 +69,10 @@ Format:
 After each completed change:
 1. **CHANGELOG.md** - Add entry with version, branch, timestamps (UTC + local)
 2. **FINDINGS.md** - Document lessons learned and discoveries
-3. **README.md** - Update feature list (features only, not fixes)
+3. **README.md** - **MANDATORY for features**: Update Key Features section with new feature description
+   - For NEW features: Add entry under "Current Release" section
+   - For FIX to existing feature: Update the relevant feature description if behavior changed
+   - Features MUST be documented before merge - do not skip this step
 4. **TODO.md** - Remove completed item, move next item to Current
 
 ## Project Overview
