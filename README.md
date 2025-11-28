@@ -17,7 +17,13 @@ In a bit more detail, here is what happens when you submit a query:
 
 ## Key Features
 
-### Current Release (v0.10.0)
+### Current Release (v0.11.0)
+- **System Timezone MCP Server**: New MCP server for retrieving timezone information
+  - Tool: `get-timezone-list` returns system timezone and complete tz database list
+  - Parses Wikipedia's timezone database for comprehensive coverage (500+ timezones)
+  - 24-hour caching for efficiency
+
+### Previous Release (v0.10.0)
 - **System Geo-Location MCP Server**: New MCP server for retrieving location based on IP
   - Tool: `get-system-geo-location` returns City, State/Region, Postal Code, Country
   - Uses whatismyip.com for IP-based geolocation

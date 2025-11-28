@@ -30,6 +30,12 @@
       "command": ["python3", "-m", "mcp_servers.system_geo_location.server"],
       "port": null,
       "description": "Returns the system's geographic location (City, State/Region, Postal Code, Country) based on IP address"
+    },
+    {
+      "name": "system-timezone",
+      "command": ["python3", "-m", "mcp_servers.system_timezone.server"],
+      "port": null,
+      "description": "Returns list of time zones from the tz database"
     }
   ]
 }
