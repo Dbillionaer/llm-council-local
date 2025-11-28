@@ -69,8 +69,12 @@ Track these steps as TODOs and complete them one by one.
 9. **Confirm completion** - Ensure every item in `tasks.md` is finished before updating statuses
 10. **Final test run** - All tests MUST pass before committing: `uv run -m tests.test_runner`
 11. **Update checklist** - After all work is done, set every task to `- [x]` so the list reflects reality
-12. **Commit and push** - `git add -A && git commit -m "v<version>: <description>" && git push -u origin v<version>`
-13. **Approval gate** - Do not merge to master until the proposal is reviewed and approved
+12. **Commit, merge, and push** - IMMEDIATELY after tests pass, complete ALL steps:
+    ```bash
+    git add -A && git commit -m "v<version>: <description>" && git push -u origin v<version>
+    git checkout master && git merge v<version> && git push origin master
+    ```
+    **⚠️ CRITICAL: Complete merge to master in the SAME session - do not wait for separate approval!**
 
 ### Stage 3: Archiving Changes
 After deployment, create separate PR to:

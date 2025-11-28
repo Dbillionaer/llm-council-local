@@ -259,17 +259,24 @@ git add -A
 git commit -m "v<version>: <brief description of changes>"
 ```
 
-**Step 6: Push Branch to Remote**
+**Step 6: Commit and Push to Feature Branch**
 ```bash
+git add -A
+git commit -m "v<version>: <brief description>"
 git push -u origin v<new-version>
 ```
 
-**Step 7: Merge to Master (when approved)**
+**Step 7: Merge to Master and Sync (IMMEDIATELY after tests pass)**
 ```bash
 git checkout master
 git merge v<new-version>
 git push origin master
 ```
+
+**⚠️ CRITICAL: Steps 6-7 must be completed in the SAME session once all tests pass!**
+- Do NOT wait for separate approval - merge immediately after successful tests
+- This ensures GitHub repo stays in sync with local changes
+- Failing to complete Step 7 leaves changes orphaned on feature branch only
 
 ### Branch Naming Convention
 Version branches: `v<release>.<feature>.<fix>` (e.g., `v0.1.0`, `v1.2.3`)
@@ -336,6 +343,17 @@ uv run -m tests.test_runner --max-iterations 3
    ```bash
    uv run -m tests.test_runner  # Full test suite
    ```
+
+5. **After ALL tests pass**: Commit, merge to master, and push IMMEDIATELY
+   ```bash
+   git add -A
+   git commit -m "v<version>: <description>"
+   git push -u origin v<version>
+   git checkout master
+   git merge v<version>
+   git push origin master
+   ```
+   **⚠️ Do NOT skip the merge step - changes must sync to GitHub in the same session!**
 
 #### Adding Tests for New Features
 When implementing a new feature:
