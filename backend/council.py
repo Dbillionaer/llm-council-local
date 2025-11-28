@@ -15,6 +15,7 @@ from .model_metrics import (
     get_valid_models
 )
 from .mcp.registry import get_mcp_registry
+from .prompt_library import generate_extraction_prompt, find_matching_prompt
 
 
 # ============== Token Tracking ==============
@@ -249,22 +250,19 @@ FACT 3: A tool WAS EXECUTED and returned REAL DATA below
 
 The tool output below is REAL. Use it."""
         
-        # Add specific guidance for websearch results
+        # Use intelligent prompt engineering for extraction guidance
         tool_type = tool_result.get('tool', '')
-        if 'search' in tool_type.lower():
-            interpretation_guide = """
-IMPORTANT: For web search results:
-- The "snippet" field contains ACTUAL NEWS/CONTENT from each source
-- The "title" field is often just the website name, NOT the actual headline
-- EXTRACT and PRESENT the real information FROM THE SNIPPETS
-- Look for actual events, names, dates, and news items in the snippets
-- Do NOT just list website names - that's not useful to the user"""
-        else:
-            interpretation_guide = ""
+        tool_output = tool_result.get('output', {})
+        
+        # Try to get a dynamically generated or cached extraction prompt
+        extraction_prompt = await generate_extraction_prompt(user_query, tool_type, tool_output)
         
         prompt = f"""TOOL OUTPUT (LIVE DATA - USE THIS):
 {tool_context}
-{interpretation_guide}
+
+EXTRACTION INSTRUCTIONS:
+{extraction_prompt}
+
 Question: {user_query}
 
 Present the tool output as current facts. Be concise but complete."""

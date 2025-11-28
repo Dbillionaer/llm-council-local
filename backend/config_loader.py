@@ -210,6 +210,17 @@ def get_formatter_model() -> str:
     return config["models"]["chairman"]["id"]
 
 
+def get_prompt_engineer_model() -> str:
+    """Get prompt engineer model ID. Returns chairman model if not configured."""
+    config = load_config()
+    prompt_engineer = config["models"].get("prompt_engineer", {})
+    prompt_engineer_id = prompt_engineer.get("id", "").strip()
+    if prompt_engineer_id:
+        return prompt_engineer_id
+    # Fall back to chairman model
+    return config["models"]["chairman"]["id"]
+
+
 def get_tool_calling_model() -> str:
     """Get tool calling model ID. Returns first council model if not configured."""
     config = load_config()
@@ -317,6 +328,11 @@ def get_model_connection_info(model_id: str) -> Dict[str, str]:
     formatter = models.get("formatter", {})
     if formatter.get("id") == model_id:
         return resolve_model_connection_params(formatter, server_config)
+    
+    # Check prompt_engineer model
+    prompt_engineer = models.get("prompt_engineer", {})
+    if prompt_engineer.get("id") == model_id:
+        return resolve_model_connection_params(prompt_engineer, server_config)
     
     # Check tool_calling model
     tool_calling = models.get("tool_calling", {})
