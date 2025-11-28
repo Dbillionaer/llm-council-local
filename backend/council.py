@@ -3,6 +3,7 @@
 import time
 import re
 import json
+from datetime import datetime
 from typing import List, Dict, Any, Tuple, AsyncGenerator, Callable, Optional
 from .lmstudio import query_models_parallel, query_model_with_retry, query_model_streaming
 from .config import COUNCIL_MODELS, CHAIRMAN_MODEL, FORMATTER_MODEL
@@ -105,6 +106,10 @@ async def chairman_direct_response(
     Returns:
         Dict with 'model', 'response', 'type'
     """
+    # Include current date/time context
+    current_time = datetime.now()
+    time_context = f"(Current date: {current_time.strftime('%B %d, %Y')}, Time: {current_time.strftime('%H:%M')})"
+    
     # Build prompt based on whether tools were used
     if tool_result and tool_result.get('success'):
         tool_context = format_tool_result_for_prompt(tool_result)
@@ -113,12 +118,14 @@ async def chairman_direct_response(
 {tool_context}
 
 Question: {user_query}
+{time_context}
 
-Provide a clear, direct answer. Be concise but complete."""
+Provide a clear, direct answer using the tool output. Be concise but complete."""
     else:
         prompt = f"""Answer this question directly and concisely.
 
 Question: {user_query}
+{time_context}
 
 Provide a helpful, accurate answer. Be concise but complete."""
     
@@ -385,7 +392,19 @@ async def _phase1_analyze_query(user_query: str, detailed_tool_info: str) -> Opt
     Returns:
         Dict with 'needs_tool', 'tool_name', 'server', 'reasoning' or None on failure
     """
+    # Include current date/time context so model knows the actual time
+    current_time = datetime.now()
+    time_context = f"""CURRENT DATE/TIME CONTEXT:
+- Current Date: {current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A, %B %d, %Y')})
+- Current Time: {current_time.strftime('%H:%M:%S')} (local timezone)
+- Year: {current_time.year}
+
+IMPORTANT: Use this current date/time information when determining if tools are needed.
+For any query about "today", "current", "now", "this week", "recent news", etc., you should use the system-date-time tool to get accurate time information, and/or websearch for current events."""
+
     analysis_prompt = f"""You are an intelligent assistant that analyzes user queries to determine if external tools are needed.
+
+{time_context}
 
 {detailed_tool_info}
 
@@ -397,6 +416,8 @@ Consider:
 1. Does the query require real-time data (current time, web search, live info)?
 2. Does the query require computation (math calculations)?
 3. Can the query be answered better with tool assistance?
+4. For questions about "today's news", "current events", "what's happening now" - ALWAYS use websearch tool
+5. For questions about current date/time - use system-date-time tool
 
 Respond with a JSON object:
 - If a tool IS needed:

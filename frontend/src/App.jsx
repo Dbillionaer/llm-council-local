@@ -274,6 +274,10 @@ function App() {
               const lastMsg = messages[messages.length - 1];
               lastMsg.stage3 = event.data;
               lastMsg.loading.stage3 = false;
+              // Update classification status to complete
+              if (lastMsg.classification) {
+                lastMsg.classification.status = 'complete';
+              }
               if (lastMsg.streaming?.stage3) {
                 lastMsg.streaming.stage3.isStreaming = false;
                 lastMsg.streaming.stage3.tokensPerSecond = event.tokens_per_second;
@@ -518,6 +522,10 @@ function App() {
               const lastMsg = messages[messages.length - 1];
               lastMsg.stage3 = event.data;
               lastMsg.loading.stage3 = false;
+              // Update classification status to complete
+              if (lastMsg.classification) {
+                lastMsg.classification.status = 'complete';
+              }
               if (lastMsg.streaming?.stage3) {
                 lastMsg.streaming.stage3.isStreaming = false;
                 lastMsg.streaming.stage3.tokensPerSecond = event.tokens_per_second;
@@ -684,6 +692,10 @@ function App() {
             const lastMsg = messages[messages.length - 1];
             lastMsg.stage3 = event.data;
             lastMsg.loading.stage3 = false;
+            // Update classification status to complete
+            if (lastMsg.classification) {
+              lastMsg.classification.status = 'complete';
+            }
             if (lastMsg.streaming?.stage3) {
               lastMsg.streaming.stage3.isStreaming = false;
               lastMsg.streaming.stage3.tokensPerSecond = event.tokens_per_second;
@@ -901,6 +913,10 @@ function App() {
             const lastMsg = messages[messages.length - 1];
             lastMsg.stage3 = { model: event.model, response: event.response };
             lastMsg.loading.stage3 = false;
+            // Update classification status to complete
+            if (lastMsg.classification) {
+              lastMsg.classification.status = 'complete';
+            }
             if (lastMsg.streaming?.stage3) {
               lastMsg.streaming.stage3.isStreaming = false;
               lastMsg.streaming.stage3.tokensPerSecond = event.tokens_per_second;
