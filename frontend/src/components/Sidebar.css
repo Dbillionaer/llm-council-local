@@ -428,3 +428,50 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+
+/* Duplicate cleanup button */
+.duplicate-cleanup-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.duplicate-cleanup-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #f57c00 0%, #e65100 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+}
+
+.duplicate-cleanup-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cleanup-icon {
+  font-size: 16px;
+}
+
+.cleanup-label {
+  flex: 1;
+  text-align: left;
+}
+
+.duplicate-count {
+  background: rgba(255, 255, 255, 0.25);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: bold;
+}
+

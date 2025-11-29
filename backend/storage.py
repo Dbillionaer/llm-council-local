@@ -320,3 +320,126 @@ def save_final_answer_markdown(conversation_id: str, final_answer: str):
     
     print(f"[Storage] Saved final answer to: {filepath}")
     return str(filepath)
+
+
+def find_duplicate_conversations() -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Find conversations with the same user queries (potential duplicates).
+    
+    Conversations are considered duplicates if they have:
+    1. The same number of user messages
+    2. The same content in each user message (in order)
+    
+    Returns:
+        Dict mapping a "signature" (hash of queries) to list of matching conversations
+    """
+    ensure_data_dir()
+    
+    import hashlib
+    
+    # Group conversations by their user queries signature
+    signature_groups = {}
+    
+    for filename in os.listdir(DATA_DIR):
+        if not filename.endswith('.json'):
+            continue
+            
+        path = os.path.join(DATA_DIR, filename)
+        try:
+            with open(path, 'r') as f:
+                data = json.load(f)
+                
+            # Skip deleted conversations
+            if data.get("deleted", False):
+                continue
+                
+            # Extract user queries
+            user_queries = []
+            for msg in data.get("messages", []):
+                if msg.get("role") == "user":
+                    user_queries.append(msg.get("content", "").strip())
+            
+            # Create signature from queries
+            if not user_queries:
+                continue  # Skip empty conversations
+                
+            signature = hashlib.md5("|".join(user_queries).encode()).hexdigest()
+            
+            if signature not in signature_groups:
+                signature_groups[signature] = []
+            
+            # Get created_at for sorting
+            created_at = data.get("created_at", "")
+            if isinstance(created_at, str):
+                try:
+                    from datetime import datetime
+                    created_at_ts = datetime.fromisoformat(created_at.replace('Z', '+00:00')).timestamp()
+                except:
+                    created_at_ts = 0
+            else:
+                created_at_ts = float(created_at) if created_at else 0
+                
+            signature_groups[signature].append({
+                "id": data["id"],
+                "title": data.get("title", "New Conversation"),
+                "query_count": len(user_queries),
+                "first_query": user_queries[0][:100] if user_queries else "",
+                "created_at": data.get("created_at"),
+                "created_at_ts": created_at_ts
+            })
+        except Exception as e:
+            print(f"Error reading {filename}: {e}")
+            continue
+    
+    # Filter to only groups with duplicates (more than 1 conversation)
+    duplicates = {sig: convs for sig, convs in signature_groups.items() if len(convs) > 1}
+    
+    # Sort each group by creation time (newest first)
+    for sig in duplicates:
+        duplicates[sig].sort(key=lambda x: x["created_at_ts"], reverse=True)
+    
+    return duplicates
+
+
+def delete_duplicate_conversations(keep_newest: bool = True) -> Dict[str, Any]:
+    """
+    Find and soft-delete duplicate conversations.
+    
+    Args:
+        keep_newest: If True, keep the newest conversation in each duplicate group.
+                    If False, keep the oldest.
+    
+    Returns:
+        Dict with deletion statistics
+    """
+    duplicates = find_duplicate_conversations()
+    
+    deleted_count = 0
+    kept_count = 0
+    deleted_ids = []
+    
+    for signature, conversations in duplicates.items():
+        if len(conversations) <= 1:
+            continue
+        
+        # Sort by creation time
+        conversations.sort(key=lambda x: x["created_at_ts"], reverse=keep_newest)
+        
+        # Keep the first one (newest or oldest depending on keep_newest)
+        kept_count += 1
+        
+        # Delete the rest
+        for conv in conversations[1:]:
+            try:
+                soft_delete_conversation(conv["id"])
+                deleted_count += 1
+                deleted_ids.append(conv["id"])
+            except Exception as e:
+                print(f"Error deleting {conv['id']}: {e}")
+    
+    return {
+        "duplicate_groups_found": len(duplicates),
+        "conversations_deleted": deleted_count,
+        "conversations_kept": kept_count,
+        "deleted_ids": deleted_ids
+    }

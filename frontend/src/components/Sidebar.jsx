@@ -15,6 +15,8 @@ export default function Sidebar({
   const [isRecycleBinView, setIsRecycleBinView] = useState(false);
   const [deletedConversations, setDeletedConversations] = useState([]);
   const [hoveredDeleteBtn, setHoveredDeleteBtn] = useState(null);
+  const [duplicateInfo, setDuplicateInfo] = useState(null);
+  const [isDeletingDuplicates, setIsDeletingDuplicates] = useState(false);
   
   // MCP status state
   const [mcpStatus, setMcpStatus] = useState(null);
@@ -92,6 +94,55 @@ export default function Sidebar({
       fetchDeletedConversations();
     }
   }, [isRecycleBinView]);
+
+  // Fetch duplicate info on mount and when conversations change
+  useEffect(() => {
+    fetchDuplicateInfo();
+  }, [conversations]);
+
+  const fetchDuplicateInfo = async () => {
+    try {
+      const response = await fetch('http://localhost:8001/api/conversations/duplicates');
+      if (response.ok) {
+        const info = await response.json();
+        setDuplicateInfo(info);
+      }
+    } catch (error) {
+      console.error('Failed to fetch duplicate info:', error);
+    }
+  };
+
+  const handleDeleteDuplicates = async () => {
+    if (isDeletingDuplicates) return;
+    
+    const totalDuplicates = duplicateInfo?.groups?.reduce(
+      (sum, g) => sum + g.conversations.length - 1, 0
+    ) || 0;
+    
+    if (!confirm(`This will move ${totalDuplicates} duplicate conversation(s) to the recycle bin, keeping the newest copy of each. Continue?`)) {
+      return;
+    }
+    
+    setIsDeletingDuplicates(true);
+    try {
+      const response = await fetch('http://localhost:8001/api/conversations/duplicates/delete?keep_newest=true', {
+        method: 'POST',
+      });
+      if (response.ok) {
+        const result = await response.json();
+        alert(`Deleted ${result.conversations_deleted} duplicate(s), kept ${result.conversations_kept} unique conversation(s).`);
+        // Refresh conversations list
+        window.location.reload();
+      } else {
+        alert('Failed to delete duplicates');
+      }
+    } catch (error) {
+      console.error('Failed to delete duplicates:', error);
+      alert('Error deleting duplicates');
+    } finally {
+      setIsDeletingDuplicates(false);
+    }
+  };
 
   const fetchDeletedConversations = async () => {
     try {
@@ -338,6 +389,22 @@ export default function Sidebar({
       {!isRecycleBinView && (
         <>
           <div className="separator" />
+          {duplicateInfo && duplicateInfo.duplicate_groups > 0 && (
+            <button 
+              className="duplicate-cleanup-btn" 
+              onClick={handleDeleteDuplicates}
+              disabled={isDeletingDuplicates}
+              title={`Found ${duplicateInfo.duplicate_groups} group(s) of duplicate conversations`}
+            >
+              <span className="cleanup-icon">🧹</span>
+              <span className="cleanup-label">
+                {isDeletingDuplicates ? 'Cleaning...' : 'Clean Duplicates'}
+              </span>
+              <span className="duplicate-count">
+                {duplicateInfo.groups?.reduce((sum, g) => sum + g.conversations.length - 1, 0) || 0}
+              </span>
+            </button>
+          )}
           <button 
             className="recycle-bin-btn" 
             onClick={() => setIsRecycleBinView(true)}

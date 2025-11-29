@@ -247,6 +247,42 @@ async def migrate_conversation_titles():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/conversations/duplicates")
+async def get_duplicate_conversations():
+    """Find conversations with identical user queries (potential duplicates)."""
+    try:
+        duplicates = storage.find_duplicate_conversations()
+        return {
+            "duplicate_groups": len(duplicates),
+            "groups": [
+                {
+                    "signature": sig,
+                    "query_count": convs[0]["query_count"] if convs else 0,
+                    "first_query": convs[0]["first_query"] if convs else "",
+                    "conversations": convs
+                }
+                for sig, convs in duplicates.items()
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/conversations/duplicates/delete")
+async def delete_duplicate_conversations(keep_newest: bool = True):
+    """Delete all duplicate conversations, keeping one copy of each.
+    
+    Args:
+        keep_newest: If true, keep the newest conversation in each group.
+                    If false, keep the oldest.
+    """
+    try:
+        result = storage.delete_duplicate_conversations(keep_newest=keep_newest)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/conversations/deleted")
 async def list_deleted_conversations():
     """List all deleted conversations."""

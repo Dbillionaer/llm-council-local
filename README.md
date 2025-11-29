@@ -17,7 +17,14 @@ In a bit more detail, here is what happens when you submit a query:
 
 ## Key Features
 
-### Current Release (v0.21.0)
+### Current Release (v0.22.0)
+- **Duplicate Conversation Cleanup**: UI button to find and delete duplicate conversations
+  - Automatically detects conversations with identical user queries (same count and content)
+  - "Clean Duplicates" button appears in sidebar when duplicates exist
+  - Keeps newest copy of each duplicate group, moves others to recycle bin
+  - Shows count of removable duplicates in the button
+
+### Previous Release (v0.21.0)
 - **LLM-Based Tool Confidence Routing**: Intelligent tool selection using expectation analysis
   - Step 1: LLM analyzes user expectations and determines data types needed
   - Step 2: Deterministic mapping from data types to appropriate tools

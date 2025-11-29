@@ -4,6 +4,32 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.22.0
+**Branch:** `v0.22.0`  
+**Completed:** 2025-11-29 05:50 UTC | 2025-11-28 21:50 PST
+
+**Features:**
+- **Duplicate Conversation Cleanup**: UI to find and delete duplicate conversations
+  - New backend endpoints:
+    - `GET /api/conversations/duplicates` - Find duplicate conversation groups
+    - `POST /api/conversations/duplicates/delete` - Delete duplicates, keep newest
+  - Sidebar "Clean Duplicates" button (appears when duplicates exist)
+  - Shows count of removable duplicates
+  - Confirms before deletion, keeps newest copy of each group
+
+**Technical Details:**
+- `find_duplicate_conversations()` - Groups conversations by MD5 hash of user queries
+- `delete_duplicate_conversations()` - Soft-deletes duplicates, keeps one per group
+- Frontend fetches duplicate info on mount and when conversations change
+
+**Changes:**
+- `backend/storage.py` - Added duplicate detection and deletion functions
+- `backend/main.py` - Added API endpoints for duplicates
+- `frontend/src/components/Sidebar.jsx` - Added cleanup button and logic
+- `frontend/src/components/Sidebar.css` - Added button styling
+
+---
+
 ### v0.21.3
 **Branch:** `v0.21.3`  
 **Completed:** 2025-11-29 05:45 UTC | 2025-11-28 21:45 PST
