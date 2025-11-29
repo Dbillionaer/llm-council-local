@@ -585,6 +585,13 @@ WEBSEARCH_KEYWORDS = ['news', 'current events', 'latest', 'recent', 'happening',
                       "today's", 'this week', 'trending', 'breaking', 'headlines',
                       'weather', 'forecast', 'temperature', 'right now', 'currently']
 
+# Keywords that strongly indicate geolocation is required
+GEOLOCATION_KEYWORDS = ['my location', 'my address', "where am i", "what's my address",
+                        'my ip', 'my city', 'my country', 'located', 'my postal',
+                        'my zip code', 'my region', 'geolocation', 'ip address',
+                        'what city', 'which city', 'what state', 'which state',
+                        'what country', 'which country']
+
 # Phrases that indicate the model is refusing to use tool data
 REFUSAL_PHRASES = [
     "cannot access",
@@ -606,6 +613,9 @@ REFUSAL_PHRASES = [
     "as of my training",
     "i cannot browse",
     "i can't browse",
+    "don't have access to personal",
+    "do not have access to personal",
+    "cannot access personal",
 ]
 
 
@@ -648,6 +658,12 @@ def _requires_websearch(query: str) -> bool:
     return any(keyword in query_lower for keyword in WEBSEARCH_KEYWORDS)
 
 
+def _requires_geolocation(query: str) -> bool:
+    """Check if query contains keywords that strongly suggest geolocation is needed."""
+    query_lower = query.lower()
+    return any(keyword in query_lower for keyword in GEOLOCATION_KEYWORDS)
+
+
 async def _phase1_analyze_query(user_query: str, detailed_tool_info: str) -> Optional[Dict[str, Any]]:
     """
     Phase 1: Analyze the query to determine if MCP tools are needed.
@@ -663,6 +679,16 @@ async def _phase1_analyze_query(user_query: str, detailed_tool_info: str) -> Opt
             "tool_name": "websearch.search",
             "server": "websearch",
             "reasoning": "Query about current events/news requires websearch"
+        }
+    
+    # Fast path: if query contains geolocation keywords, short-circuit to geo-location
+    if _requires_geolocation(user_query):
+        print(f"[MCP Phase 1] Geolocation keywords detected, using geo-location directly")
+        return {
+            "needs_tool": True,
+            "tool_name": "system-geo-location.get-system-geo-location",
+            "server": "system-geo-location",
+            "reasoning": "Query about location/address requires geolocation lookup"
         }
     
     # Include current date/time context so model knows the actual time

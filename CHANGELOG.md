@@ -4,6 +4,36 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.20.4
+**Branch:** `v0.20.4`  
+**Completed:** 2025-11-29 02:45 UTC | 2025-11-28 18:45 PST
+
+**Fixes:**
+- **Geolocation Tool Fast-Path**: Added keyword-based fast-path for geolocation queries
+  - "What's my address?" now correctly triggers the geo-location tool
+  - Added `GEOLOCATION_KEYWORDS` list similar to `WEBSEARCH_KEYWORDS`
+  - Added `_requires_geolocation()` function for keyword detection
+  - Updated `_phase1_analyze_query()` with geolocation fast-path
+  - Updated `needs_tool_check` condition in main.py
+
+**Keywords Added:**
+- `my location`, `my address`, `where am i`, `what's my address`
+- `my ip`, `my city`, `my country`, `located`, `my postal`
+- `my zip code`, `my region`, `geolocation`, `ip address`
+- `what city`, `which city`, `what state`, `which state`
+- `what country`, `which country`
+
+**Additional:**
+- Added refusal phrases for "don't have access to personal"
+- Enabled geolocation test scenario in scenarios.json
+
+**Changes:**
+- `backend/council.py` - Added GEOLOCATION_KEYWORDS and _requires_geolocation()
+- `backend/main.py` - Added geolocation check to needs_tool_check condition
+- `tests/scenarios.json` - Updated geolocation test scenario
+
+---
+
 ### v0.20.3
 **Branch:** `v0.20.3`  
 **Completed:** 2025-11-29 01:45 UTC | 2025-11-28 17:45 PST

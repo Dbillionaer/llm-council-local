@@ -58,13 +58,14 @@
     },
     {
       "name": "geolocation",
-      "query": "Where am I located based on my IP?",
+      "query": "What's my address?",
       "expected_behavior": {
-        "has_content": true
+        "tool_used": "system-geo-location.get-system-geo-location",
+        "has_content": true,
+        "not_contains": ["cannot access", "don't have access to personal"]
       },
-      "tags": ["mcp", "geolocation", "optional"],
-      "timeout_seconds": 60.0,
-      "disabled": true
+      "tags": ["mcp", "geolocation", "core"],
+      "timeout_seconds": 60.0
     },
     {
       "name": "factual_capital",

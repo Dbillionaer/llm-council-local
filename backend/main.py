@@ -19,7 +19,7 @@ from .council import (
     stage1_collect_responses_streaming, stage2_collect_rankings_streaming,
     stage3_synthesize_streaming,
     classify_message, chairman_direct_response, check_and_execute_tools,
-    _requires_websearch
+    _requires_websearch, _requires_geolocation
 )
 from .title_generation import title_service
 from .model_validator import validate_models
@@ -538,11 +538,12 @@ async def send_message_stream_tokens(conversation_id: str, request: SendMessageR
             yield f"data: {json.dumps({'type': 'classification_complete', 'classification': classification})}\n\n"
             
             # Check for tool usage first (regardless of message type)
-            # Also force tool check for websearch keywords
+            # Also force tool check for websearch or geolocation keywords
             tool_result = None
             needs_tool_check = (
                 classification.get("requires_tools", False) or
-                _requires_websearch(request.content)  # Force check for news/events queries
+                _requires_websearch(request.content) or  # Force check for news/events queries
+                _requires_geolocation(request.content)   # Force check for location queries
             )
             if needs_tool_check:
                 yield f"data: {json.dumps({'type': 'tool_check_start'})}\n\n"
