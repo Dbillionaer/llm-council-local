@@ -8,7 +8,7 @@
   "models": {
     "council": [
       {
-        "id": "exaone-deep-7.8b-mlx",
+        "id": "llama-3.2-3b-instruct",
         "name": "EXAONE Deep",
         "description": "EXAONE Deep 7.8B model with MLX optimization",
         "ip": "",
@@ -17,7 +17,7 @@
         "api_key": ""
       },
       {
-        "id": "apollo-v0.1-4b-thinking-qx86x-hi-mlx",
+        "id": "llama-3.2-3b-instruct",
         "name": "Apollo 4B Thinking",
         "description": "Apollo's thinking model with MLX optimization",
         "ip": "",
@@ -26,7 +26,7 @@
         "api_key": ""
       },
       {
-        "id": "ai21-jamba-reasoning-3b-hi-mlx",
+        "id": "llama-3.2-3b-instruct",
         "name": "AI21 Jamba Reasoning",
         "description": "AI21's Jamba reasoning model",
         "ip": "",

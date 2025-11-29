@@ -1149,17 +1149,24 @@ def _extract_clean_tool_output(output: Any) -> str:
             else:
                 return f"Result: {result}"
         
-        # DateTime output
-        if 'datetime' in output or 'date' in output:
+        # DateTime output - use the pre-formatted string if available
+        if 'datetime' in output or 'date' in output or 'formatted' in output:
+            # Use the formatted string which already includes timezone
+            if 'formatted' in output:
+                return output['formatted']
+            
             parts = []
+            tz_str = output.get('timezone', 'local')
             if 'datetime' in output:
-                parts.append(f"Date and time: {output['datetime']} (local time)")
+                parts.append(f"Date and time: {output['datetime']} ({tz_str})")
             if 'date' in output and 'datetime' not in output:
-                parts.append(f"Date: {output['date']}")
+                parts.append(f"Date: {output.get('formatted_date', output['date'])}")
             if 'time' in output and 'datetime' not in output:
-                parts.append(f"Time: {output['time']} (local time)")
-            if 'weekday' in output:
+                parts.append(f"Time: {output['time']} ({tz_str})")
+            if 'weekday' in output and 'formatted' not in str(output):
                 parts.append(f"Day: {output['weekday']}")
+            if 'location' in output and output['location'].strip(', '):
+                parts.append(f"Location: {output['location']}")
             return '\n'.join(parts) if parts else str(output)
         
         # Location output

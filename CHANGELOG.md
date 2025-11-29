@@ -4,6 +4,28 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.23.3
+**Branch:** `v0.23.3`  
+**Completed:** 2025-11-29 09:50 UTC | 2025-11-29 01:50 PST
+
+**Fixes:**
+- **Tool Stats Overlay Visibility**: Fix overlay not appearing on hover
+  - Changed `overflow: hidden` to `overflow: visible` on tool card
+  - Increased z-index to 1000 for proper stacking
+
+- **DateTime Timezone Detection**: Datetime tool now auto-detects timezone from IP
+  - Enhanced `system_date_time` server to call ipinfo.io for timezone
+  - Returns formatted string with timezone: "Saturday, November 29, 2025 at 01:43 AM (America/Los_Angeles)"
+  - Includes user location in response
+  - Updated clean output extraction to use pre-formatted string
+
+**Changes:**
+- `frontend/src/components/Stage1.css` - Fix overlay visibility
+- `mcp_servers/system_date_time/server.py` - Add timezone detection
+- `backend/council.py` - Update datetime output extraction
+
+---
+
 ### v0.23.2
 **Branch:** `v0.23.2`  
 **Completed:** 2025-11-29 09:25 UTC | 2025-11-29 01:25 PST
