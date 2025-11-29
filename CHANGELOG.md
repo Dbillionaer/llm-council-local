@@ -4,6 +4,21 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.22.2
+**Branch:** `v0.22.2`  
+**Completed:** 2025-11-29 05:58 UTC | 2025-11-28 21:58 PST
+
+**Fixes:**
+- **Duplicate Cleanup Fix**: Fixed `soft_delete_conversation is not defined` error
+  - Added `soft_delete_conversation()` function to `storage.py`
+  - Function marks conversation as deleted with timestamp
+  - Used by `delete_duplicate_conversations()` for soft deletion
+
+**Changes:**
+- `backend/storage.py` - Added `soft_delete_conversation()` function
+
+---
+
 ### v0.22.0
 **Branch:** `v0.22.0`  
 **Completed:** 2025-11-29 05:50 UTC | 2025-11-28 21:50 PST

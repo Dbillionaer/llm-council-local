@@ -102,6 +102,23 @@ def delete_conversation(conversation_id: str) -> bool:
         return False
 
 
+def soft_delete_conversation(conversation_id: str) -> bool:
+    """Soft delete a conversation (move to recycle bin)."""
+    try:
+        conversation = get_conversation(conversation_id)
+        if not conversation:
+            return False
+        
+        # Mark as deleted
+        conversation["deleted"] = True
+        conversation["deleted_at"] = time.time()
+        save_conversation(conversation)
+        return True
+    except Exception as e:
+        print(f"Error soft deleting {conversation_id}: {e}")
+        return False
+
+
 def list_conversations() -> List[Dict[str, Any]]:
     """
     List all conversations (metadata only), including deleted status.
