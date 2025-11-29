@@ -4,6 +4,21 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.29.7
+**Branch:** `v0.29.7`  
+**Completed:** 2025-11-29 17:00 UTC | 2025-11-29 09:00 PST
+
+**Fixes:**
+- **Blank Page After Loading**: Fixed app showing blank page after loading spinner
+  - `initializeApp` function lacked proper error handling for unexpected errors
+  - If any initialization step failed, `isInitializing` was never set to false
+  - Added try-catch-finally to guarantee loading state completes even on errors
+
+**Changes:**
+- `frontend/src/App.jsx` - Wrap `initializeApp` in try-catch-finally block
+
+---
+
 ### v0.29.6
 **Branch:** `v0.29.6`  
 **Completed:** 2025-11-29 16:56 UTC | 2025-11-29 08:56 PST

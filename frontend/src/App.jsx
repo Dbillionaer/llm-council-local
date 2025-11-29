@@ -15,25 +15,30 @@ function App() {
   // Load conversations on mount and restore last viewed conversation
   useEffect(() => {
     const initializeApp = async () => {
-      const convs = await loadConversations();
-      
-      // Restore last viewed conversation from localStorage
-      const lastConversationId = localStorage.getItem('lastConversationId');
-      if (lastConversationId && convs?.some(c => c.id === lastConversationId)) {
-        setCurrentConversationId(lastConversationId);
-        // Load the conversation before showing the app
-        try {
-          const conv = await api.getConversation(lastConversationId);
-          setCurrentConversation(conv);
-        } catch (error) {
-          console.error('Failed to restore conversation:', error);
+      try {
+        const convs = await loadConversations();
+        
+        // Restore last viewed conversation from localStorage
+        const lastConversationId = localStorage.getItem('lastConversationId');
+        if (lastConversationId && convs?.some(c => c.id === lastConversationId)) {
+          setCurrentConversationId(lastConversationId);
+          // Load the conversation before showing the app
+          try {
+            const conv = await api.getConversation(lastConversationId);
+            setCurrentConversation(conv);
+          } catch (error) {
+            console.error('Failed to restore conversation:', error);
+            localStorage.removeItem('lastConversationId');
+          }
+        } else if (lastConversationId) {
+          // Conversation was deleted, clear stale reference
           localStorage.removeItem('lastConversationId');
         }
-      } else if (lastConversationId) {
-        // Conversation was deleted, clear stale reference
-        localStorage.removeItem('lastConversationId');
+      } catch (error) {
+        console.error('Failed to initialize app:', error);
+      } finally {
+        setIsInitializing(false);
       }
-      setIsInitializing(false);
     };
     initializeApp();
   }, []);
