@@ -4,6 +4,24 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.22.7
+**Branch:** `v0.22.7`  
+**Completed:** 2025-11-29 06:30 UTC | 2025-11-28 22:30 PST
+
+**Fixes:**
+- **Title Regeneration on Edit**: Editing the first message now regenerates the title
+  - Added `regenerate_title` flag to API request model
+  - `handleEditMessage` sets `regenerateTitle: true` when editing first message (index 0)
+  - Backend includes `regenerate_title` in `needs_title` condition
+  - Title reflects new content after editing first message
+
+**Changes:**
+- `frontend/src/App.jsx` - Pass `regenerateTitle` flag when editing first message
+- `frontend/src/api.js` - Add `regenerateTitle` parameter to `sendMessageStreamTokens`
+- `backend/main.py` - Add `regenerate_title` field to request model, update title condition
+
+---
+
 ### v0.22.6
 **Branch:** `v0.22.6`  
 **Completed:** 2025-11-29 06:25 UTC | 2025-11-28 22:25 PST

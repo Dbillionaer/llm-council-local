@@ -668,7 +668,7 @@ function App() {
   };
 
   const runCouncilForMessage = async (content, options = {}) => {
-    const { truncateAt = null, skipUserMessage = false } = options;
+    const { truncateAt = null, skipUserMessage = false, regenerateTitle = false } = options;
     
     // Create a partial assistant message that will be updated progressively
     const assistantMessage = {
@@ -697,7 +697,7 @@ function App() {
     }));
 
     // Send message with token-level streaming
-    // Pass truncateAt and skipUserMessage for re-run scenarios
+    // Pass truncateAt, skipUserMessage, and regenerateTitle for re-run/edit scenarios
     await api.sendMessageStreamTokens(currentConversationId, content, (eventType, event) => {
       switch (eventType) {
         case 'classification_start':
@@ -1086,11 +1086,14 @@ function App() {
           setIsLoading(false);
           break;
       }
-    }, truncateAt, skipUserMessage);
+    }, truncateAt, skipUserMessage, regenerateTitle);
   };
 
   const handleEditMessage = async (messageIndex, newContent) => {
     if (!currentConversationId || isLoading) return;
+    
+    // Check if editing the first user message - should regenerate title
+    const isFirstUserMessage = messageIndex === 0;
     
     // Update the message content and remove subsequent messages
     setCurrentConversation((prev) => {
@@ -1102,9 +1105,13 @@ function App() {
     // Re-run the council with the edited message
     // truncateAt=messageIndex-1 tells backend to remove the old user message and everything after
     // Then backend will add the new user message
+    // regenerateTitle=true when editing first message
     setIsLoading(true);
     try {
-      await runCouncilForMessage(newContent, { truncateAt: messageIndex - 1 });
+      await runCouncilForMessage(newContent, { 
+        truncateAt: messageIndex - 1,
+        regenerateTitle: isFirstUserMessage
+      });
     } catch (error) {
       console.error('Failed to edit message:', error);
       setIsLoading(false);

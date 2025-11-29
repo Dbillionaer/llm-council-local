@@ -5,11 +5,6 @@ This file tracks pending changes organized by priority. AI agents should process
 ## Current
 <!-- Items actively being worked on. Maximum 3 items. -->
 
-- [ ] **[FIX]** Title not updating on message edit
-  - Edit button should trigger title regeneration
-  - OpenSpec: `fix-title-update-on-edit`
-  - Files: `frontend/src/App.jsx`, `frontend/src/components/ChatInterface.jsx`
-
 ## Next
 <!-- Items queued for implementation after Current is complete. Maximum 5 items. -->
 

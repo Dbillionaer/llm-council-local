@@ -120,13 +120,16 @@ export const api = {
    * @param {function} onEvent - Callback function for each event: (eventType, data) => void
    * @returns {Promise<void>}
    */
-  async sendMessageStreamTokens(conversationId, content, onEvent, truncateAt = null, skipUserMessage = false) {
+  async sendMessageStreamTokens(conversationId, content, onEvent, truncateAt = null, skipUserMessage = false, regenerateTitle = false) {
     const body = { content };
     if (truncateAt !== null) {
       body.truncate_at = truncateAt;
     }
     if (skipUserMessage) {
       body.skip_user_message = true;
+    }
+    if (regenerateTitle) {
+      body.regenerate_title = true;
     }
     
     const response = await fetch(

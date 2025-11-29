@@ -146,6 +146,7 @@ class SendMessageRequest(BaseModel):
     content: str
     truncate_at: Optional[int] = None  # Index to truncate messages before re-run
     skip_user_message: bool = False  # Skip adding user message (for re-runs)
+    regenerate_title: bool = False  # Force title regeneration (for edits)
 
 
 class ConversationMetadata(BaseModel):
@@ -502,8 +503,8 @@ async def send_message_stream_tokens(conversation_id: str, request: SendMessageR
     # Check if this is the first message and conversation has generic title
     is_first_message = len(conversation["messages"]) == 0
     current_title = conversation.get("title", "").strip()
-    # Check if title needs generation (generic title pattern)
-    needs_title = current_title.startswith("Conversation ") or not current_title
+    # Check if title needs generation (generic title pattern or forced regeneration)
+    needs_title = current_title.startswith("Conversation ") or not current_title or request.regenerate_title
 
     async def token_event_generator():
         try:
@@ -511,7 +512,7 @@ async def send_message_stream_tokens(conversation_id: str, request: SendMessageR
             if not request.skip_user_message:
                 storage.add_user_message(conversation_id, request.content)
 
-            # Generate title if needed (first message or still has generic title)
+            # Generate title if needed (first message, generic title, or forced regeneration)
             if needs_title:
                 yield f"data: {json.dumps({'type': 'title_generation_start'})}\n\n"
                 
