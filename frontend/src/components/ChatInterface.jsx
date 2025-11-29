@@ -139,27 +139,77 @@ export default function ChatInterface({
 
                   {/* Tool result card - shown for both direct and deliberation responses */}
                   {/* Check both toolResult (streaming) and tool_result (stored) */}
-                  {(msg.toolResult || msg.tool_result) && (
-                    <div className="tool-result-card">
-                      <div className="tool-result-header">
-                        <span className="tool-icon">🔧</span>
-                        <span className="tool-name">MCP Tool: {(msg.toolResult || msg.tool_result).tool || `${(msg.toolResult || msg.tool_result).server}.${(msg.toolResult || msg.tool_result).tool}`}</span>
-                        {(msg.toolResult || msg.tool_result).executionTime !== undefined && (
-                          <span className="tool-time">{(msg.toolResult || msg.tool_result).executionTime}s</span>
-                        )}
-                      </div>
-                      <div className="tool-result-body">
-                        <div className="tool-io">
-                          <span className="tool-label">Input:</span>
-                          <code className="tool-value">{JSON.stringify((msg.toolResult || msg.tool_result).input)}</code>
+                  {(msg.toolResult || msg.tool_result) && (() => {
+                    const toolData = msg.toolResult || msg.tool_result;
+                    const toolName = toolData.tool || `${toolData.server}.${toolData.tool}`;
+                    const execTime = toolData.executionTime;
+                    const input = toolData.input;
+                    const output = toolData.output;
+                    
+                    // Extract output text for display
+                    let outputText = '';
+                    if (typeof output === 'string') {
+                      outputText = output;
+                    } else if (output?.content?.[0]?.text) {
+                      outputText = output.content[0].text;
+                    } else {
+                      outputText = JSON.stringify(output, null, 2);
+                    }
+                    
+                    // Truncate long output
+                    const truncatedOutput = outputText.length > 500 
+                      ? outputText.substring(0, 500) + '...' 
+                      : outputText;
+                    
+                    return (
+                      <div className="tool-result-card">
+                        <div className="tool-result-header">
+                          <span className="tool-icon">🔧</span>
+                          <span className="tool-name">MCP Tool: {toolName}</span>
+                          {execTime !== undefined && (
+                            <span className="tool-time">{execTime}s</span>
+                          )}
                         </div>
-                        <div className="tool-io">
-                          <span className="tool-label">Output:</span>
-                          <code className="tool-value">{typeof (msg.toolResult || msg.tool_result).output === 'string' ? (msg.toolResult || msg.tool_result).output : JSON.stringify((msg.toolResult || msg.tool_result).output)}</code>
+                        <div className="tool-result-body">
+                          <div className="tool-io">
+                            <span className="tool-label">Input:</span>
+                            <code className="tool-value">{JSON.stringify(input)}</code>
+                          </div>
+                          <div className="tool-io">
+                            <span className="tool-label">Output:</span>
+                            <code className="tool-value">{typeof output === 'string' ? output : JSON.stringify(output)}</code>
+                          </div>
+                        </div>
+                        
+                        {/* Hover overlay with detailed stats */}
+                        <div className="tool-stats-overlay">
+                          <div className="tool-stats-title">📊 Tool Call Details</div>
+                          <div className="tool-stats-row">
+                            <span className="tool-stats-label">Server</span>
+                            <span className="tool-stats-value">{toolData.server || 'unknown'}</span>
+                          </div>
+                          <div className="tool-stats-row">
+                            <span className="tool-stats-label">Tool</span>
+                            <span className="tool-stats-value">{toolData.tool || toolName}</span>
+                          </div>
+                          <div className="tool-stats-row">
+                            <span className="tool-stats-label">Execution Time</span>
+                            <span className="tool-stats-value">{execTime !== undefined ? `${execTime}s` : 'N/A'}</span>
+                          </div>
+                          <div className="tool-stats-row">
+                            <span className="tool-stats-label">Status</span>
+                            <span className={`tool-stats-value ${toolData.success !== false ? 'success' : 'error'}`}>
+                              {toolData.success !== false ? '✓ Success' : '✗ Failed'}
+                            </span>
+                          </div>
+                          <div className="tool-stats-output">
+                            <div className="tool-stats-output-label">Full Output:</div>
+                            <div className="tool-stats-output-value">{truncatedOutput}</div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {/* For direct responses, skip Stage 1 and Stage 2 */}
                   {msg.responseType !== 'direct' && (

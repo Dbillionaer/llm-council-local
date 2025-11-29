@@ -4,6 +4,22 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.23.2
+**Branch:** `v0.23.2`  
+**Completed:** 2025-11-29 09:25 UTC | 2025-11-29 01:25 PST
+
+**Features:**
+- **Tool Call Stats Overlay**: Hover over purple MCP tool card to see detailed stats
+  - Shows server name, tool name, execution time, success status
+  - Displays full output (truncated to 500 chars)
+  - Dark theme overlay with smooth hover animation
+
+**Changes:**
+- `frontend/src/components/ChatInterface.jsx` - Add stats overlay to tool card
+- `frontend/src/components/Stage1.css` - Add overlay styles
+
+---
+
 ### v0.23.1
 **Branch:** `v0.23.1`  
 **Completed:** 2025-11-29 07:00 UTC | 2025-11-28 23:00 PST

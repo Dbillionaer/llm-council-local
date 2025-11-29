@@ -172,6 +172,17 @@
   border-radius: 8px;
   background: linear-gradient(135deg, #f3e5f5 0%, #ffffff 100%);
   overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease;
+}
+
+.tool-result-card:hover {
+  box-shadow: 0 4px 12px rgba(156, 39, 176, 0.3);
+}
+
+.tool-result-card:hover .tool-stats-overlay {
+  display: block;
 }
 
 .tool-result-header {
@@ -230,5 +241,94 @@
   border-radius: 4px;
   font-size: 13px;
   color: #333;
+  word-break: break-all;
+}
+
+/* Tool Stats Overlay */
+.tool-stats-overlay {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  z-index: 100;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  font-size: 13px;
+}
+
+.tool-stats-overlay::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 20px;
+  width: 12px;
+  height: 12px;
+  background: #1a1a2e;
+  transform: rotate(45deg);
+}
+
+.tool-stats-title {
+  font-weight: 600;
+  color: #bb86fc;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.tool-stats-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tool-stats-row:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.tool-stats-label {
+  color: #888;
+}
+
+.tool-stats-value {
+  color: #fff;
+  font-family: monospace;
+}
+
+.tool-stats-value.success {
+  color: #4caf50;
+}
+
+.tool-stats-value.error {
+  color: #f44336;
+}
+
+.tool-stats-output {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tool-stats-output-label {
+  color: #888;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+
+.tool-stats-output-value {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 8px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  max-height: 150px;
+  overflow-y: auto;
+  white-space: pre-wrap;
   word-break: break-all;
 }
