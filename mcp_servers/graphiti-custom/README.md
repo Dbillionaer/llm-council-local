@@ -158,9 +158,14 @@ WARNING - Invalid entity IDs in edge extraction for LIKES. source_entity_id: 0, 
 **Example:** For "Jane likes Nike shoes":
 1. Entity extraction finds only "Jane" (entity 0)
 2. Edge extraction outputs "Jane (0) LIKES Nike shoes (1)"
-3. Entity 1 doesn't exist → warning logged, edge skipped
+3. Entity 1 doesn't exist → edge skipped
 
-**Impact:** None - this is gracefully handled. The edge is skipped and processing continues.
+**Our Enhancement (v0.20.3):**
+- Changed log level from WARNING to DEBUG for cleaner logs
+- Added tracking infrastructure for future multi-turn extraction
+- The edge is still skipped, but logs are less noisy
+
+**Impact:** Minimal - edges referencing missing entities are skipped. The knowledge graph still captures entities and relationships that were successfully extracted.
 
 **Mitigation:** Use a larger/more capable LLM model for more consistent entity extraction.
 

@@ -10,12 +10,14 @@ RUN git clone --depth 1 https://github.com/getzep/graphiti.git /app/graphiti
 
 WORKDIR /app/graphiti/mcp_server
 
-# Copy custom LM Studio client and patch script
+# Copy custom LM Studio client and patch scripts
 COPY lmstudio_client.py /app/graphiti/mcp_server/src/
 COPY patch_factories.py /app/
+COPY patch_edge_logging.py /app/
 
-# Run the patch script
+# Run the patch scripts
 RUN python /app/patch_factories.py
+RUN python /app/patch_edge_logging.py
 
 # Install dependencies
 RUN pip install --no-cache-dir uv && \

@@ -4,6 +4,30 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.20.3
+**Branch:** `v0.20.3`  
+**Completed:** 2025-11-29 01:45 UTC | 2025-11-28 17:45 PST
+
+**Improvements:**
+- **Graphiti Edge Extraction Logging**: Reduced log noise for missing entity warnings
+  - Changed log level from WARNING to DEBUG for "Invalid entity IDs in edge extraction"
+  - Added new `patch_edge_logging.py` patch script
+  - Updated Dockerfile to apply patch during build
+  - Edges with missing entities still skipped, but logs are cleaner
+
+**Technical Details:**
+- The issue occurs when LLM edge extraction references entities not in the entity list
+- This is expected behavior with local LLMs due to inconsistent entity/edge extraction
+- Full multi-turn extraction would require significant upstream changes
+- Current solution: Clean logs + skip invalid edges (same behavior, less noise)
+
+**Changes:**
+- `mcp_servers/graphiti-custom/patch_edge_logging.py` - New patch script
+- `mcp_servers/graphiti-custom/Dockerfile` - Added patch execution
+- `mcp_servers/graphiti-custom/README.md` - Updated documentation
+
+---
+
 ### v0.20.2
 **Branch:** `v0.20.2`  
 **Completed:** 2025-11-29 01:25 UTC | 2025-11-28 17:25 PST
