@@ -4,6 +4,21 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.29.3
+**Branch:** `v0.29.3`  
+**Completed:** 2025-11-29 15:26 UTC | 2025-11-29 07:26 PST
+
+**Fixes:**
+- **Hide Fake Placeholder Images Completely**: Fake/placeholder images now render as nothing instead of showing alt text
+  - Previously showed confusing gray italic text for fake URLs
+  - Now returns null, completely hiding the fake image reference
+  - Provides cleaner display for old conversations with placeholder URLs
+
+**Changes:**
+- `frontend/src/components/MarkdownRenderer.jsx` - SmartImage returns null for error/fake images
+
+---
+
 ### v0.29.2
 **Branch:** `v0.29.2`  
 **Completed:** 2025-11-29 15:25 UTC | 2025-11-29 07:25 PST

@@ -56,13 +56,10 @@ function SmartImage({ src, alt, ...props }) {
     setShowPreview(false);
   };
 
-  // If image failed to load or is fake, show alt text as styled text
+  // If image failed to load or is fake, don't render anything
+  // Fake placeholder images (via.placeholder.com, etc.) provide no value
   if (imageStatus === 'error') {
-    return (
-      <span className="image-alt-text" title={`Image: ${alt || 'No description'}`}>
-        {alt || 'Image'}
-      </span>
-    );
+    return null;
   }
 
   // If image is still loading, show placeholder
