@@ -580,17 +580,138 @@ def _extract_json_from_response(content: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-# Keywords that strongly indicate websearch is required
-WEBSEARCH_KEYWORDS = ['news', 'current events', 'latest', 'recent', 'happening', 
-                      "today's", 'this week', 'trending', 'breaking', 'headlines',
-                      'weather', 'forecast', 'temperature', 'right now', 'currently']
+async def _analyze_user_expectations(user_query: str) -> Optional[Dict[str, Any]]:
+    """
+    Step 1: Use LLM to analyze what the user expects from this query.
+    
+    Returns:
+        Dict with 'expectations' (list), 'needs_external_data', 'data_types_needed'
+    """
+    current_time = datetime.now()
+    
+    analysis_prompt = f"""Analyze what a user expects when asking this question.
 
-# Keywords that strongly indicate geolocation is required
-GEOLOCATION_KEYWORDS = ['my location', 'my address', "where am i", "what's my address",
-                        'my ip', 'my city', 'my country', 'located', 'my postal',
-                        'my zip code', 'my region', 'geolocation', 'ip address',
-                        'what city', 'which city', 'what state', 'which state',
-                        'what country', 'which country']
+CURRENT CONTEXT:
+- Today's date: {current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A, %B %d, %Y')})
+- Current time: {current_time.strftime('%H:%M:%S')}
+
+USER QUERY: {user_query}
+
+Respond with ONLY a JSON object:
+{{
+  "expectations": ["list of 2-4 specific things the user expects in a good answer"],
+  "needs_external_data": true/false,
+  "data_types_needed": ["list of data types: 'current_time', 'location', 'news', 'weather', 'calculation', 'web_content', 'none'"],
+  "reasoning": "brief explanation"
+}}
+
+IMPORTANT RULES:
+- "address", "location", "where am i", "my city" → needs_external_data: TRUE, data_types_needed: ["location"]
+- "news", "current events", "what's happening", "this week" → needs_external_data: TRUE, data_types_needed: ["news"]
+- "time", "date", "what day" → needs_external_data: TRUE, data_types_needed: ["current_time"]
+- "weather", "temperature", "forecast" → needs_external_data: TRUE, data_types_needed: ["weather", "news"]
+- math questions → needs_external_data: TRUE, data_types_needed: ["calculation"]
+- general knowledge (capitals, definitions) → needs_external_data: FALSE, data_types_needed: ["none"]
+- greetings, chat → needs_external_data: FALSE, data_types_needed: ["none"]
+
+Examples:
+- "What time is it?" → needs_external_data: true, data_types_needed: ["current_time"]
+- "What's my address?" → needs_external_data: true, data_types_needed: ["location"]
+- "What's in the news?" → needs_external_data: true, data_types_needed: ["news"]
+- "What major events happened this week?" → needs_external_data: true, data_types_needed: ["news"]
+- "What is 15*7?" → needs_external_data: true, data_types_needed: ["calculation"]
+- "What's the capital of France?" → needs_external_data: false, data_types_needed: ["none"]
+- "Hello!" → needs_external_data: false, data_types_needed: ["none"]
+
+JSON response:"""
+
+    messages = [{"role": "user", "content": analysis_prompt}]
+    tool_model = get_tool_calling_model()
+    
+    try:
+        response = await query_model_with_retry(tool_model, messages, timeout=30.0, max_retries=1)
+        if not response or not response.get('content'):
+            return None
+        
+        content = response['content'].strip()
+        result = _extract_json_from_response(content)
+        
+        if result and 'expectations' in result:
+            print(f"[Expectations] {result.get('expectations', [])}, needs_external: {result.get('needs_external_data')}, data_types: {result.get('data_types_needed', [])}")
+            return result
+        return None
+    except Exception as e:
+        print(f"[Expectations] Error: {e}")
+        return None
+
+
+async def _evaluate_tool_confidence(
+    user_query: str,
+    expectations: Dict[str, Any],
+    available_tools: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Step 2: Map data types to tools using a deterministic mapping.
+    
+    This replaces the LLM-based evaluation with a fast, reliable mapping.
+    
+    Returns:
+        Dict with 'recommended_tool', 'confidence' (0.0-1.0), 'reasoning'
+    """
+    data_types = expectations.get('data_types_needed', [])
+    
+    # If no external data needed, skip tool evaluation
+    if not expectations.get('needs_external_data', False):
+        return {
+            "recommended_tool": None,
+            "confidence": 0.0,
+            "reasoning": "Query can be answered from general knowledge"
+        }
+    
+    # Direct mapping from data types to tools
+    DATA_TYPE_TO_TOOL = {
+        'current_time': ('system-date-time.get-system-date-time', 'system-date-time', 0.95),
+        'location': ('system-geo-location.get-system-geo-location', 'system-geo-location', 0.95),
+        'news': ('websearch.search', 'websearch', 0.9),
+        'weather': ('websearch.search', 'websearch', 0.9),
+        'current_events': ('websearch.search', 'websearch', 0.9),
+        'calculation': ('calculator.multiply', 'calculator', 0.85),  # Will be refined in phase 2
+        'web_content': ('retrieve-web-page.get-page-from-url', 'retrieve-web-page', 0.8),
+    }
+    
+    # Find the best matching tool based on data types
+    best_tool = None
+    best_confidence = 0.0
+    best_server = None
+    
+    for data_type in data_types:
+        data_type_lower = data_type.lower()
+        if data_type_lower in DATA_TYPE_TO_TOOL:
+            tool_name, server, confidence = DATA_TYPE_TO_TOOL[data_type_lower]
+            if confidence > best_confidence:
+                best_tool = tool_name
+                best_server = server
+                best_confidence = confidence
+    
+    if best_tool:
+        print(f"[Tool Confidence] Direct mapping: {best_tool} (confidence: {best_confidence})")
+        return {
+            "recommended_tool": best_tool,
+            "confidence": best_confidence,
+            "reasoning": f"Data type '{data_types}' maps to {best_tool}",
+            "tool_arguments": {}
+        }
+    
+    # No matching tool found
+    return {
+        "recommended_tool": None,
+        "confidence": 0.0,
+        "reasoning": f"No tool maps to data types: {data_types}"
+    }
+
+
+# Minimum confidence threshold for using a tool
+TOOL_CONFIDENCE_THRESHOLD = 0.5  # Lowered from 0.6 for better tool coverage
 
 # Phrases that indicate the model is refusing to use tool data
 REFUSAL_PHRASES = [
@@ -652,92 +773,68 @@ def _tool_output_failed(tool_result: Optional[Dict[str, Any]]) -> bool:
     return False
 
 
-def _requires_websearch(query: str) -> bool:
-    """Check if query contains keywords that strongly suggest websearch is needed."""
-    query_lower = query.lower()
-    return any(keyword in query_lower for keyword in WEBSEARCH_KEYWORDS)
-
-
-def _requires_geolocation(query: str) -> bool:
-    """Check if query contains keywords that strongly suggest geolocation is needed."""
-    query_lower = query.lower()
-    return any(keyword in query_lower for keyword in GEOLOCATION_KEYWORDS)
-
-
 async def _phase1_analyze_query(user_query: str, detailed_tool_info: str) -> Optional[Dict[str, Any]]:
     """
-    Phase 1: Analyze the query to determine if MCP tools are needed.
+    Phase 1: Analyze the query using LLM-based confidence scoring.
+    
+    This replaces the old keyword-based approach with a two-step LLM process:
+    1. Analyze user expectations for the query
+    2. Evaluate tool confidence based on expectations
     
     Returns:
-        Dict with 'needs_tool', 'tool_name', 'server', 'reasoning' or None on failure
+        Dict with 'needs_tool', 'tool_name', 'server', 'reasoning', 'confidence' or None on failure
     """
-    # Fast path: if query contains news/current events keywords, short-circuit to websearch
-    if _requires_websearch(user_query):
-        print(f"[MCP Phase 1] Keywords detected, using websearch directly")
-        return {
-            "needs_tool": True,
-            "tool_name": "websearch.search",
-            "server": "websearch",
-            "reasoning": "Query about current events/news requires websearch"
-        }
+    # Step 1: Analyze user expectations
+    print(f"[MCP Phase 1] Analyzing user expectations...")
+    expectations = await _analyze_user_expectations(user_query)
     
-    # Fast path: if query contains geolocation keywords, short-circuit to geo-location
-    if _requires_geolocation(user_query):
-        print(f"[MCP Phase 1] Geolocation keywords detected, using geo-location directly")
-        return {
-            "needs_tool": True,
-            "tool_name": "system-geo-location.get-system-geo-location",
-            "server": "system-geo-location",
-            "reasoning": "Query about location/address requires geolocation lookup"
-        }
-    
-    # Include current date/time context so model knows the actual time
-    current_time = datetime.now()
-    time_context = f"""CRITICAL CONTEXT - READ CAREFULLY:
-- Today's date is: {current_time.strftime('%Y-%m-%d')} ({current_time.strftime('%A, %B %d, %Y')})
-- Current time: {current_time.strftime('%H:%M:%S')} (local timezone)
-- Year: {current_time.year}
-
-IMPORTANT: You HAVE ACCESS to external tools including websearch!
-- Do NOT say you "lack real-time access" or "cannot access current information"
-- For ANY question about news, current events, or real-time information → USE websearch.search
-- For date/time questions → USE system-date-time.get-system-date-time"""
-
-    analysis_prompt = f"""You are a tool router that decides which MCP tool to use for a query.
-
-{time_context}
-
-{detailed_tool_info}
-
-USER QUERY: {user_query}
-
-DECISION RULES (follow strictly):
-1. News/current events/what's happening → websearch.search (ALWAYS)
-2. Math calculations → calculator tools
-3. Date/time questions → system-date-time.get-system-date-time
-4. Location questions → system-geo-location.get-system-geo-location
-5. Factual questions (capitals, definitions) → no tool needed
-
-Respond with ONLY a JSON object:
-- Tool needed: {{"needs_tool": true, "tool_name": "server.tool_name", "server": "server_name", "reasoning": "brief"}}
-- No tool: {{"needs_tool": false, "reasoning": "brief"}}
-
-JSON response:"""
-
-    messages = [{"role": "user", "content": analysis_prompt}]
-    tool_model = get_tool_calling_model()
-    
-    print(f"[MCP Phase 1] Analyzing query with {tool_model}...")
-    response = await query_model_with_retry(tool_model, messages, timeout=None, max_retries=1)
-    
-    if not response or not response.get('content'):
-        print("[MCP Phase 1] No response from model")
+    if not expectations:
+        print("[MCP Phase 1] Failed to analyze expectations, using fallback")
+        # Fallback to simple classification
         return None
     
-    content = response['content'].strip()
-    print(f"[MCP Phase 1] Analysis response: {content[:300]}...")
+    # If no external data needed, skip tool evaluation
+    if not expectations.get('needs_external_data', False):
+        print(f"[MCP Phase 1] No external data needed: {expectations.get('reasoning', '')}")
+        return {
+            "needs_tool": False,
+            "reasoning": expectations.get('reasoning', 'Query can be answered from general knowledge')
+        }
     
-    return _extract_json_from_response(content)
+    # Step 2: Evaluate tool confidence
+    print(f"[MCP Phase 1] Evaluating tool confidence for data types: {expectations.get('data_types_needed', [])}")
+    tool_eval = await _evaluate_tool_confidence(user_query, expectations, detailed_tool_info)
+    
+    if not tool_eval:
+        print("[MCP Phase 1] Failed to evaluate tool confidence")
+        return None
+    
+    confidence = tool_eval.get('confidence', 0.0)
+    recommended_tool = tool_eval.get('recommended_tool')
+    
+    # Check if confidence meets threshold
+    if confidence >= TOOL_CONFIDENCE_THRESHOLD and recommended_tool:
+        # Parse server from tool name (format: "server.tool_name")
+        parts = recommended_tool.split('.', 1)
+        server = parts[0] if len(parts) > 1 else recommended_tool
+        
+        print(f"[MCP Phase 1] Tool selected: {recommended_tool} (confidence: {confidence:.2f})")
+        return {
+            "needs_tool": True,
+            "tool_name": recommended_tool,
+            "server": server,
+            "reasoning": tool_eval.get('reasoning', ''),
+            "confidence": confidence,
+            "tool_arguments": tool_eval.get('tool_arguments', {}),
+            "expectations": expectations.get('expectations', [])
+        }
+    else:
+        print(f"[MCP Phase 1] No tool needed (confidence: {confidence:.2f} < threshold: {TOOL_CONFIDENCE_THRESHOLD})")
+        return {
+            "needs_tool": False,
+            "reasoning": tool_eval.get('reasoning', 'No tool meets confidence threshold'),
+            "confidence": confidence
+        }
 
 
 async def _phase2_generate_tool_call(

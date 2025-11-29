@@ -18,8 +18,7 @@ from .council import (
     stage3_synthesize_final, calculate_aggregate_rankings,
     stage1_collect_responses_streaming, stage2_collect_rankings_streaming,
     stage3_synthesize_streaming,
-    classify_message, chairman_direct_response, check_and_execute_tools,
-    _requires_websearch, _requires_geolocation
+    classify_message, chairman_direct_response, check_and_execute_tools
 )
 from .title_generation import title_service
 from .model_validator import validate_models
@@ -537,36 +536,30 @@ async def send_message_stream_tokens(conversation_id: str, request: SendMessageR
             classification = await classify_message(request.content, on_event)
             yield f"data: {json.dumps({'type': 'classification_complete', 'classification': classification})}\n\n"
             
-            # Check for tool usage first (regardless of message type)
-            # Also force tool check for websearch or geolocation keywords
+            # Always check for tool usage using LLM-based confidence scoring
+            # The new system uses expectation analysis to determine if tools can help
             tool_result = None
-            needs_tool_check = (
-                classification.get("requires_tools", False) or
-                _requires_websearch(request.content) or  # Force check for news/events queries
-                _requires_geolocation(request.content)   # Force check for location queries
-            )
-            if needs_tool_check:
-                yield f"data: {json.dumps({'type': 'tool_check_start'})}\n\n"
-                tool_result = await check_and_execute_tools(request.content, on_event)
-                
-                # Stream any tool events
-                while not events_queue.empty():
-                    event_type, data = events_queue.get_nowait()
-                    yield f"data: {json.dumps({'type': event_type, **data})}\n\n"
-                
-                # Send tool_result event for frontend display if tool was used successfully
-                if tool_result and tool_result.get('success'):
-                    from .council import format_tool_result_for_prompt
-                    tool_context = format_tool_result_for_prompt(tool_result)
-                    tool_name = f"{tool_result.get('server')}.{tool_result.get('tool')}"
-                    tool_event = {
-                        'type': 'tool_result',
-                        'tool': tool_name,
-                        'input': tool_result.get('input'),
-                        'output': tool_result.get('output'),
-                        'formatted': tool_context
-                    }
-                    yield f"data: {json.dumps(tool_event)}\n\n"
+            yield f"data: {json.dumps({'type': 'tool_check_start'})}\n\n"
+            tool_result = await check_and_execute_tools(request.content, on_event)
+            
+            # Stream any tool events
+            while not events_queue.empty():
+                event_type, data = events_queue.get_nowait()
+                yield f"data: {json.dumps({'type': event_type, **data})}\n\n"
+            
+            # Send tool_result event for frontend display if tool was used successfully
+            if tool_result and tool_result.get('success'):
+                from .council import format_tool_result_for_prompt
+                tool_context = format_tool_result_for_prompt(tool_result)
+                tool_name = f"{tool_result.get('server')}.{tool_result.get('tool')}"
+                tool_event = {
+                    'type': 'tool_result',
+                    'tool': tool_name,
+                    'input': tool_result.get('input'),
+                    'output': tool_result.get('output'),
+                    'formatted': tool_context
+                }
+                yield f"data: {json.dumps(tool_event)}\n\n"
             
             # ===== ROUTING DECISION =====
             msg_type = classification.get("type", "deliberation")

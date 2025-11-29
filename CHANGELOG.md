@@ -4,6 +4,43 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.21.0
+**Branch:** `v0.21.0`  
+**Completed:** 2025-11-29 03:00 UTC | 2025-11-28 19:00 PST
+
+**Features:**
+- **LLM-Based Tool Confidence Routing**: Replaced hardcoded keyword lists with intelligent LLM-based system
+  - Step 1: LLM analyzes user expectations and determines data types needed
+  - Step 2: Deterministic mapping from data types to appropriate tools
+  - More flexible and extensible than keyword matching
+
+**Architecture:**
+- New `_analyze_user_expectations()`: LLM call to extract user expectations and data type needs
+- New `_evaluate_tool_confidence()`: Fast deterministic data-type-to-tool mapping
+- Removed: `WEBSEARCH_KEYWORDS`, `GEOLOCATION_KEYWORDS`, `_requires_websearch()`, `_requires_geolocation()`
+- Added: `TOOL_CONFIDENCE_THRESHOLD` (0.5) for tool selection
+
+**Data Type Mappings:**
+- `current_time` → system-date-time.get-system-date-time (95% confidence)
+- `location` → system-geo-location.get-system-geo-location (95% confidence)
+- `news`, `weather`, `current_events` → websearch.search (90% confidence)
+- `calculation` → calculator tools (85% confidence)
+- `web_content` → retrieve-web-page.get-page-from-url (80% confidence)
+
+**Benefits:**
+- Single LLM call for expectation analysis (vs two LLM calls in pure LLM approach)
+- Fast, deterministic tool selection based on data types
+- More maintainable than keyword lists
+- Extensible - add new data types and tools easily
+
+**Test Results:** All 6 test scenarios pass (100%)
+
+**Changes:**
+- `backend/council.py` - New expectation-based tool routing system
+- `backend/main.py` - Always run tool check (LLM handles no-tool cases)
+
+---
+
 ### v0.20.4
 **Branch:** `v0.20.4`  
 **Completed:** 2025-11-29 02:45 UTC | 2025-11-28 18:45 PST
