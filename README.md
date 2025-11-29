@@ -17,7 +17,13 @@ In a bit more detail, here is what happens when you submit a query:
 
 ## Key Features
 
-### Current Release (v0.25.0)
+### Current Release (v0.26.0)
+- **Restore Last Conversation on Refresh**: Automatically opens the last viewed conversation on app start
+  - Persists current conversation ID to localStorage
+  - Restores on page refresh or app restart
+  - Handles deleted conversations gracefully (clears stale reference)
+
+### Previous Release (v0.25.0)
 - **Pinned User Message Header**: Original question stays visible when scrolling
   - Semi-transparent header with backdrop blur appears when scrolled
   - Shows truncated preview of first user message

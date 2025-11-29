@@ -11,9 +11,21 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [titleGenerationStatus, setTitleGenerationStatus] = useState({}); // conversation_id -> status
 
-  // Load conversations on mount
+  // Load conversations on mount and restore last viewed conversation
   useEffect(() => {
-    loadConversations();
+    const initializeApp = async () => {
+      const convs = await loadConversations();
+      
+      // Restore last viewed conversation from localStorage
+      const lastConversationId = localStorage.getItem('lastConversationId');
+      if (lastConversationId && convs?.some(c => c.id === lastConversationId)) {
+        setCurrentConversationId(lastConversationId);
+      } else if (lastConversationId) {
+        // Conversation was deleted, clear stale reference
+        localStorage.removeItem('lastConversationId');
+      }
+    };
+    initializeApp();
   }, []);
 
   // Load conversation details when selected
@@ -109,8 +121,10 @@ function App() {
     try {
       const convs = await api.listConversations();
       setConversations(convs);
+      return convs;
     } catch (error) {
       console.error('Failed to load conversations:', error);
+      return [];
     }
   };
 
@@ -129,6 +143,8 @@ function App() {
       // Refresh conversations list to maintain proper sorting order
       await loadConversations();
       setCurrentConversationId(newConv.id);
+      // Persist to localStorage for restore on refresh
+      localStorage.setItem('lastConversationId', newConv.id);
     } catch (error) {
       console.error('Failed to create conversation:', error);
     }
@@ -142,6 +158,8 @@ function App() {
     if (currentConversationId === conversationId) {
       setCurrentConversationId(null);
       setCurrentConversation(null);
+      // Clear from localStorage
+      localStorage.removeItem('lastConversationId');
     }
   };
 
@@ -152,6 +170,10 @@ function App() {
 
   const handleSelectConversation = (id) => {
     setCurrentConversationId(id);
+    // Persist to localStorage for restore on refresh
+    if (id) {
+      localStorage.setItem('lastConversationId', id);
+    }
   };
 
   // Check if new conversation button should be disabled

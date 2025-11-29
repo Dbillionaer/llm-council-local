@@ -4,6 +4,21 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.26.0
+**Branch:** `v0.26.0`  
+**Completed:** 2025-11-29 14:25 UTC | 2025-11-29 06:25 PST
+
+**Features:**
+- **Restore Last Conversation on Refresh**: Automatically opens the last viewed conversation
+  - Persists current conversation ID to localStorage when selecting/creating conversations
+  - Restores on page refresh or app restart
+  - Validates stored ID exists (clears stale reference if deleted)
+
+**Changes:**
+- `frontend/src/App.jsx` - localStorage persistence for conversation ID
+
+---
+
 ### v0.25.0
 **Branch:** `v0.25.0`  
 **Completed:** 2025-11-29 14:10 UTC | 2025-11-29 06:10 PST
