@@ -4,6 +4,33 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.23.1
+**Branch:** `v0.23.1`  
+**Completed:** 2025-11-29 07:00 UTC | 2025-11-28 23:00 PST
+
+**Fixes:**
+- **Classification Badge Flicker**: Fix badge showing "Deliberation" briefly during classifying
+  - Show "Classifying" until classification.status is explicitly "complete"
+  
+- **Clean Tool Output Formatting**: Tool responses no longer include raw JSON
+  - New `_extract_clean_tool_output()` function formats tool data for humans
+  - Calculator: "5 + 3 = 8" instead of JSON structure
+  - DateTime: "Date and time: 2025-11-29 14:30:00 (local time)"
+  - Clearer extraction prompts with explicit "do not include raw data" rules
+
+- **Prompt Engineering Improvements**: Cleaner direct responses
+  - Updated default extraction prompts for all categories
+  - Added explicit formatting rules to avoid duplicate/verbose output
+  - Cleared cached prompts to use new improved prompts
+
+**Changes:**
+- `frontend/src/components/ChatInterface.jsx` - Fix classification badge logic
+- `backend/council.py` - Add `_extract_clean_tool_output()`, improve prompt
+- `backend/prompt_library.py` - Update default extraction prompts
+- `tests/scenarios.json` - Adjust min_length for calculator tests
+
+---
+
 ### v0.23.0
 **Branch:** `v0.23.0`  
 **Completed:** 2025-11-29 06:35 UTC | 2025-11-28 22:35 PST

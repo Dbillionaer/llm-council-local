@@ -270,29 +270,33 @@ def _get_default_extraction_prompt(user_query: str, tool_name: str) -> str:
     category = _categorize_query(user_query, tool_name)
     
     defaults = {
-        'news_extraction': """Extract and present the actual news headlines and events from the tool output.
-Focus on the "snippet" fields which contain real news content - NOT just website names.
-List specific events, names, dates, and developments mentioned.
-Present as a numbered list of actual news items.""",
+        'news_extraction': """Present the news headlines naturally. 
+List specific events and developments mentioned in the snippets.
+Do not include URLs or source metadata.""",
         
-        'weather_extraction': """Extract the current weather information from the tool output.
-Look for temperature, conditions, humidity, wind, and forecast details.
-Present the weather clearly with specific values and conditions.""",
+        'weather_extraction': """State the weather conditions clearly in a natural sentence.
+Include temperature, conditions, and relevant forecast details.
+Do not include raw data or JSON.""",
         
-        'location_extraction': """Extract the geographic location information from the tool output.
-Present the city, region/state, country, and any other relevant location details.
-Be specific about the detected location.""",
+        'location_extraction': """State the location naturally.
+Include city, region/state, and country as appropriate.
+Do not include coordinates or technical location data.""",
         
-        'datetime_extraction': """Extract and present the current date and time from the tool output.
-Include the full date, day of week, and time with timezone if available.""",
+        'datetime_extraction': """State the date and time clearly in a single natural sentence.
+Example: "It's 2:15 PM on Friday, November 29, 2025."
+Do not repeat the information or include raw timestamps.""",
         
-        'web_search': """Extract the most relevant information from the search results to answer the user's question.
-Focus on the actual content in snippets, not just titles.
-Synthesize the information into a clear, helpful response.""",
+        'calculation': """State the calculation result directly.
+Example: "5 plus 3 equals 8" or "The result is 42."
+Do not show the formula or operation details unless asked.""",
         
-        'general': """Present the information from the tool output in a clear, organized manner.
-Focus on the specific data that answers the user's question.
-Use the actual values and content from the tool output."""
+        'web_search': """Synthesize the search results into a helpful response.
+Focus on answering the user's question, not listing sources.
+Do not include URLs or raw search result data.""",
+        
+        'general': """Answer the question directly using the data provided.
+Be concise and natural - do not include raw data structures.
+Focus on what the user actually wants to know."""
     }
     
     return defaults.get(category, defaults['general'])

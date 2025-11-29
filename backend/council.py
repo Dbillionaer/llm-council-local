@@ -257,15 +257,26 @@ The tool output below is REAL. Use it."""
         # Try to get a dynamically generated or cached extraction prompt
         extraction_prompt = await generate_extraction_prompt(user_query, tool_type, tool_output)
         
-        prompt = f"""TOOL OUTPUT (LIVE DATA - USE THIS):
-{tool_context}
+        # Format tool output more cleanly - extract just the result data
+        clean_output = _extract_clean_tool_output(tool_output)
+        
+        prompt = f"""A tool was executed to answer the user's question. Use ONLY the result data below.
 
-EXTRACTION INSTRUCTIONS:
+TOOL RESULT DATA:
+{clean_output}
+
+RESPONSE INSTRUCTIONS:
 {extraction_prompt}
 
-Question: {user_query}
+FORMATTING RULES:
+- Give a DIRECT, NATURAL answer - do NOT mention "tool", "output", "JSON", or technical details
+- Do NOT include raw data structures like {{"key": "value"}} in your response
+- Do NOT repeat information multiple times
+- For calculations: just state the answer (e.g., "5 plus 3 equals 8")
+- For time/date: state once clearly (e.g., "It's 2:15 PM on Friday, November 29, 2025")
+- Be conversational and concise
 
-Present the tool output as current facts. Be concise but complete."""
+Question: {user_query}"""
     elif has_tool_data and tool_failed:
         # Tool was called but failed - be honest about it
         tool_context = format_tool_result_for_prompt(tool_result)
@@ -1101,6 +1112,87 @@ async def check_and_execute_tools(user_query: str, on_event: Optional[Callable] 
                 "result": {"success": False, "error": str(e)}
             })
         return None
+
+
+def _extract_clean_tool_output(output: Any) -> str:
+    """Extract clean, human-readable data from tool output."""
+    # Extract the actual result from MCP response wrapper
+    if isinstance(output, dict) and 'content' in output:
+        content = output['content']
+        if isinstance(content, list) and len(content) > 0:
+            text_content = content[0].get('text', '')
+            try:
+                result_data = json.loads(text_content)
+                output = result_data
+            except:
+                output = text_content
+    
+    # Format based on tool type - create human-readable strings
+    if isinstance(output, dict):
+        # Calculator output
+        if 'operation' in output and 'result' in output:
+            op = output.get('operation', '')
+            operands = output.get('operands', {})
+            result = output.get('result')
+            a = operands.get('a', operands.get('value', ''))
+            b = operands.get('b', '')
+            if op == 'add':
+                return f"{a} + {b} = {result}"
+            elif op == 'subtract':
+                return f"{a} - {b} = {result}"
+            elif op == 'multiply':
+                return f"{a} × {b} = {result}"
+            elif op == 'divide':
+                return f"{a} ÷ {b} = {result}"
+            elif op in ['sqrt', 'square_root']:
+                return f"√{a} = {result}"
+            else:
+                return f"Result: {result}"
+        
+        # DateTime output
+        if 'datetime' in output or 'date' in output:
+            parts = []
+            if 'datetime' in output:
+                parts.append(f"Date and time: {output['datetime']} (local time)")
+            if 'date' in output and 'datetime' not in output:
+                parts.append(f"Date: {output['date']}")
+            if 'time' in output and 'datetime' not in output:
+                parts.append(f"Time: {output['time']} (local time)")
+            if 'weekday' in output:
+                parts.append(f"Day: {output['weekday']}")
+            return '\n'.join(parts) if parts else str(output)
+        
+        # Location output
+        if 'city' in output or 'location' in output:
+            parts = []
+            if 'city' in output:
+                parts.append(output['city'])
+            if 'region' in output:
+                parts.append(output['region'])
+            if 'country' in output:
+                parts.append(output['country'])
+            return ', '.join(parts) if parts else str(output)
+        
+        # Web search output - extract snippets
+        if 'results' in output or 'organic' in output:
+            results = output.get('results', output.get('organic', []))
+            if isinstance(results, list):
+                items = []
+                for r in results[:5]:  # Limit to 5 results
+                    title = r.get('title', '')
+                    snippet = r.get('snippet', r.get('description', ''))
+                    if title and snippet:
+                        items.append(f"• {title}: {snippet}")
+                return '\n'.join(items) if items else json.dumps(output, indent=2)
+        
+        # Generic dict - format key-value pairs
+        parts = []
+        for k, v in output.items():
+            if not k.startswith('_'):
+                parts.append(f"{k}: {v}")
+        return '\n'.join(parts) if parts else json.dumps(output, indent=2)
+    
+    return str(output)
 
 
 def format_tool_result_for_prompt(tool_result: Dict[str, Any]) -> str:

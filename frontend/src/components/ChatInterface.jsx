@@ -122,7 +122,9 @@ export default function ChatInterface({
                     {msg.classification && (
                       <span className={`classification-badge ${msg.classification.type || 'unknown'}`}>
                         {msg.classification.status === 'classifying' ? '🔍 Classifying...' : 
-                         msg.responseType === 'direct' ? '⚡ Direct' : '🤔 Deliberation'}
+                         msg.classification.status === 'complete' ? 
+                           (msg.responseType === 'direct' ? '⚡ Direct' : '🤔 Deliberation') :
+                           '🔍 Classifying...'}
                       </span>
                     )}
                   </div>
