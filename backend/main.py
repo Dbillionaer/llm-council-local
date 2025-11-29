@@ -20,6 +20,12 @@ from .council import (
     stage3_synthesize_streaming,
     classify_message, chairman_direct_response, check_and_execute_tools
 )
+from .title_service import (
+    get_title_service, 
+    initialize_title_service, 
+    shutdown_title_service
+)
+# Also import the instance for direct use
 from .title_generation import title_service
 from .model_validator import validate_models
 from .config_loader import load_config, get_memory_config
@@ -102,10 +108,19 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"⚠️  Memory initialization failed: {e} (continuing without memory)")
     
+    # Initialize Title generation service and scan for untitled conversations
+    print("📝 Initializing title generation service...")
+    try:
+        await initialize_title_service()
+        print("✅ Title generation service started")
+    except Exception as e:
+        print(f"⚠️  Title service initialization failed: {e} (continuing without auto-titles)")
+    
     yield
     
     # Shutdown
     print("🛑 Shutting down LLM Council API...")
+    await shutdown_title_service()
     await shutdown_mcp()
     print("✅ Services cleaned up")
 

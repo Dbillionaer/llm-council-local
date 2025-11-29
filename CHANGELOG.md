@@ -4,6 +4,27 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.21.3
+**Branch:** `v0.21.3`  
+**Completed:** 2025-11-29 05:45 UTC | 2025-11-28 21:45 PST
+
+**Fixes:**
+- **Title Generation at Startup**: Fixed conversations with default titles ("Conversation <id>") not being regenerated
+  - Added `initialize_title_service()` call during app startup
+  - Title service now scans for untitled conversations and queues them for generation
+  - Added `shutdown_title_service()` call during app shutdown for clean cleanup
+  - Import both `title_service` functions and instance from separate modules
+
+**Technical Details:**
+- `title_service.py` contains the full TitleGenerationService with background worker
+- `title_generation.py` contains the simpler TitleGenerationService instance
+- Both are now properly imported and used in main.py
+
+**Changes:**
+- `backend/main.py` - Initialize title service at startup, shutdown at exit
+
+---
+
 ### v0.21.2
 **Branch:** `v0.21.2`  
 **Completed:** 2025-11-29 03:35 UTC | 2025-11-28 19:35 PST
