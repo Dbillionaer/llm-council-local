@@ -13,6 +13,16 @@ This file tracks pending changes organized by priority. AI agents should process
 ## Future
 <!-- Ideas and enhancements for later consideration. No limit. -->
 
+- [ ] **[FEATURE]** Multi-round quality assessment loop
+  - Chairman evaluates final answer against original question
+  - Compiles list of shortcomings (unanswered aspects, missing details)
+  - If shortcomings found, triggers another deliberation round with feedback
+  - Council receives: original question, previous answer, shortcomings list
+  - Loop continues until chairman satisfied or max rounds reached
+  - Config: max_quality_rounds setting
+  - Related: backend/council.py, backend/config.py
+  - Reference: conversation 54708a99 (apocalyptic scenarios - answer was comparison table not actual list)
+
 - [ ] **[FEATURE]** Memory type categorization system
   - Categorize memories by type: Episodic, Semantic, Procedural, Priming, Classical Conditioning, Emotional, Prospective, Autobiographical, Spatial
   - LLM determines memory type(s) before storing
