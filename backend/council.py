@@ -185,7 +185,8 @@ Examples:
         on_event("classification_start", {"model": tool_model})
     
     try:
-        response = await query_model_with_retry(tool_model, messages, timeout=30.0, max_retries=1)
+        # Use temperature=0 for deterministic classification
+        response = await query_model_with_retry(tool_model, messages, timeout=30.0, max_retries=1, temperature=0.0)
         
         if not response or not response.get('content'):
             print("[Classification] No response, defaulting to deliberation")
@@ -677,7 +678,8 @@ JSON response:"""
     tool_model = get_tool_calling_model()
     
     try:
-        response = await query_model_with_retry(tool_model, messages, timeout=30.0, max_retries=1)
+        # Use temperature=0 for deterministic tool decision making
+        response = await query_model_with_retry(tool_model, messages, timeout=30.0, max_retries=1, temperature=0.0)
         if not response or not response.get('content'):
             return None
         
@@ -957,7 +959,8 @@ JSON response:"""
     messages = [{"role": "user", "content": assessment_prompt}]
     
     try:
-        response = await query_model_with_retry(tool_model, messages, timeout=30.0, max_retries=1)
+        # Use temperature=0 for deterministic tool assessment
+        response = await query_model_with_retry(tool_model, messages, timeout=30.0, max_retries=1, temperature=0.0)
         if not response or not response.get('content'):
             return None
         

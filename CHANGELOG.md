@@ -4,6 +4,23 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.32.1
+**Branch:** `v0.32.1`  
+**Completed:** 2025-11-30 06:58 UTC | 2025-11-29 22:58 PST
+
+**Improvements:**
+- **Deterministic tool call decisions**: Set temperature=0 for all tool-related inference calls
+  - Classification (factual/chat/deliberation) now uses temperature=0
+  - User expectations analysis uses temperature=0
+  - Mid-deliberation tool assessment uses temperature=0
+  - Reduces randomness in tool selection, making responses more consistent
+
+**Changes:**
+- `backend/lmstudio.py` - Added `temperature` parameter to `query_model()` and `query_model_with_retry()`
+- `backend/council.py` - Updated `classify_message()`, `_analyze_user_expectations()`, `assess_tool_needs_mid_deliberation()` to use temperature=0.0
+
+---
+
 ### v0.32.0
 **Branch:** `v0.32.0`  
 **Completed:** 2025-11-30 06:50 UTC | 2025-11-29 22:50 PST

@@ -44,7 +44,8 @@ async def query_model_with_retry(
     timeout: Optional[float] = None,
     max_retries: Optional[int] = None,
     for_title: bool = False,
-    for_evaluation: bool = False
+    for_evaluation: bool = False,
+    temperature: Optional[float] = None
 ) -> Optional[Dict[str, Any]]:
     """
     Query a model with retry logic and proper timeout handling.
@@ -56,6 +57,7 @@ async def query_model_with_retry(
         max_retries: Maximum retry attempts (uses config default if None)
         for_title: Whether this is for title generation (affects timeout)
         for_evaluation: Whether this is for model evaluation (shorter timeout)
+        temperature: Sampling temperature (0.0 = deterministic, higher = more random)
 
     Returns:
         Response dict with 'content' and optional 'reasoning_details', or None if failed
@@ -88,7 +90,8 @@ async def query_model_with_retry(
                 model=model,
                 messages=messages,
                 timeout=timeout,
-                connection_timeout=connection_timeout
+                connection_timeout=connection_timeout,
+                temperature=temperature
             )
         
         except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException) as e:
@@ -115,6 +118,7 @@ async def query_model(
     timeout: Optional[float] = None,
     connection_timeout: Optional[float] = None,
     max_tokens: Optional[int] = None,
+    temperature: Optional[float] = None,
     _warmup_attempted: bool = False
 ) -> Optional[Dict[str, Any]]:
     """
@@ -126,6 +130,7 @@ async def query_model(
         timeout: Request timeout in seconds (uses config default if None)
         connection_timeout: Connection timeout in seconds (uses config default if None)
         max_tokens: Maximum tokens to generate (optional, uses model default if None)
+        temperature: Sampling temperature (0.0 = deterministic, higher = more random)
 
     Returns:
         Response dict with 'content' and optional 'reasoning_details', or None if failed
@@ -160,6 +165,10 @@ async def query_model(
     # Add max_tokens if specified
     if max_tokens:
         payload["max_tokens"] = max_tokens
+    
+    # Add temperature if specified (0.0 = deterministic)
+    if temperature is not None:
+        payload["temperature"] = temperature
 
     try:
         # Use separate timeouts for connection and read
