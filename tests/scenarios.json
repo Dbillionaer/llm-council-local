@@ -103,6 +103,17 @@
       "timeout_seconds": 30.0
     },
     {
+      "name": "chat_nickname_request",
+      "query": "You shall be known as Aether from now on",
+      "expected_behavior": {
+        "has_content": true,
+        "response_type": "direct",
+        "not_contains": ["multiple perspectives", "council", "deliberation"]
+      },
+      "tags": ["chat", "core", "regression"],
+      "timeout_seconds": 30.0
+    },
+    {
       "name": "deliberation_language_comparison",
       "query": "Which programming language should I learn first, Python or JavaScript?",
       "expected_behavior": {

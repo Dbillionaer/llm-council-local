@@ -154,7 +154,7 @@ Respond with ONLY a JSON object (no other text):
 
 Classification rules:
 - "factual": Questions with definitive answers (math, dates, definitions, simple facts, how-to with clear answer)
-- "chat": Greetings, acknowledgments, small talk, simple yes/no questions about the AI itself
+- "chat": Greetings, acknowledgments, small talk, simple yes/no questions about the AI itself, commands/requests to the AI (like setting a name/nickname), confirmations, thank you messages
 - "deliberation": Opinions, comparisons, feedback requests, creative work, complex analysis, subjective questions, anything requiring multiple perspectives
 
 requires_tools rules:
@@ -172,7 +172,10 @@ Examples:
 - "What time is it?" → factual, requires_tools: true (current time)
 - "What's the current weather?" → factual, requires_tools: true (real-time data)
 - "Where am I located?" → factual, requires_tools: true (IP/location lookup)
-- "What's in the news today?" → factual, requires_tools: true (web search)"""
+- "What's in the news today?" → factual, requires_tools: true (web search)
+- "Call me John" → chat, requires_tools: false (nickname request)
+- "You shall be known as X" → chat, requires_tools: false (AI name assignment)
+- "Thanks!" → chat, requires_tools: false"""
 
     messages = [{"role": "user", "content": classification_prompt.format(query=user_query)}]
     tool_model = get_tool_calling_model()

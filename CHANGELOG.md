@@ -4,6 +4,21 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.30.9
+**Branch:** `v0.30.9`  
+**Completed:** 2025-11-30 05:15 UTC | 2025-11-29 21:15 PST
+
+**Bug Fixes:**
+- **Classification fix for nickname/command requests**: Messages like "you shall be known as Aether" now correctly classified as "chat" instead of "deliberation"
+  - Added examples for nickname requests, AI name assignments, and thank you messages
+  - Expanded "chat" category description to include commands/requests to the AI
+
+**Changes:**
+- `backend/council.py` - Updated classification prompt with new examples and expanded chat definition
+- `tests/scenarios.json` - Added `chat_nickname_request` test scenario
+
+---
+
 ### v0.30.8
 **Branch:** `v0.30.8`  
 **Completed:** 2025-11-30 04:43 UTC | 2025-11-29 20:43 PST
