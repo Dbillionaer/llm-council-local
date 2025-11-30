@@ -329,11 +329,11 @@ Types (comma-separated):"""
                     else:
                         memory_type = "general"
                     
-                    # Search facts (relationships/edges)
+                    # Search facts (relationships/edges) - uses group_ids and max_facts
                     try:
                         facts_result = await registry.call_tool(
                             f"{self.GRAPHITI_SERVER_NAME}.search_memory_facts",
-                            {"query": search_query, "group_id": group_id, "limit": limit // 2}
+                            {"query": search_query, "group_ids": [group_id], "max_facts": limit // 2}
                         )
                         
                         if facts_result.get("success"):
@@ -363,11 +363,11 @@ Types (comma-separated):"""
                     except Exception as e:
                         print(f"[Memory] Error searching facts in {group_id}: {e}")
                     
-                    # Search nodes (entities)
+                    # Search nodes (entities) - uses group_ids and max_nodes
                     try:
                         nodes_result = await registry.call_tool(
                             f"{self.GRAPHITI_SERVER_NAME}.search_nodes",
-                            {"query": search_query, "group_id": group_id, "limit": limit // 2}
+                            {"query": search_query, "group_ids": [group_id], "max_nodes": limit // 2}
                         )
                         
                         if nodes_result.get("success"):

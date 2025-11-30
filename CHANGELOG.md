@@ -4,6 +4,31 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.35.0
+**Branch:** `v0.35.0`  
+**Completed:** 2025-11-30 12:15 UTC | 2025-11-30 04:15 PST
+
+**Features:**
+- **Memory migration script**: Scans existing conversations for important facts
+  - Extracts identity/name statements (e.g., "You shall be known as Aether")
+  - Imports facts into Graphiti memory with proper timestamps
+  - Supports `--dry-run` and `--limit` options
+  - Usage: `uv run python3 -m backend.memory_migration`
+
+- **Fixed Graphiti API parameters**: Updated memory service to use correct API
+  - `group_ids` (plural) instead of `group_id`
+  - `max_nodes` and `max_facts` instead of `limit`
+
+**Changes:**
+- `backend/memory_migration.py` - New migration script
+- `backend/memory_service.py` - Fixed Graphiti API parameter names
+
+**Known Issues:**
+- Graphiti data doesn't persist across MCP server restarts (in-memory database)
+- Memory search may return empty if Graphiti server was restarted
+
+---
+
 ### v0.34.1
 **Branch:** `v0.34.1`  
 **Completed:** 2025-11-30 11:52 UTC | 2025-11-30 03:52 PST
