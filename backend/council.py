@@ -3,6 +3,7 @@
 import time
 import re
 import json
+import uuid
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Tuple, AsyncGenerator, Callable, Optional
 from .lmstudio import query_models_parallel, query_model_with_retry, query_model_streaming
@@ -1273,13 +1274,14 @@ async def deep_research_workflow(
     
     # Step 1: Web search
     print("[Deep Research] Step 1: Performing web search...")
+    search_call_id = str(uuid.uuid4())[:8]
     if on_event:
-        on_event("tool_call_start", {"tool": "websearch.web-search", "arguments": {"query": user_query}})
+        on_event("tool_call_start", {"tool": "websearch.web-search", "arguments": {"query": user_query}, "call_id": search_call_id})
     
     search_result = await registry.call_tool("websearch.web-search", {"query": user_query})
     
     if on_event:
-        on_event("tool_call_complete", {"tool": "websearch.web-search", "result": search_result})
+        on_event("tool_call_complete", {"tool": "websearch.web-search", "result": search_result, "call_id": search_call_id})
     
     if not search_result.get('success'):
         print(f"[Deep Research] Web search failed: {search_result.get('error')}")
@@ -1302,14 +1304,15 @@ async def deep_research_workflow(
     for i, url in enumerate(urls):
         print(f"[Deep Research] Scraping {i+1}/{len(urls)}: {url[:60]}...")
         
+        scrape_call_id = str(uuid.uuid4())[:8]
         if on_event:
-            on_event("tool_call_start", {"tool": "firecrawl.firecrawl-scrape", "arguments": {"url": url}})
+            on_event("tool_call_start", {"tool": "firecrawl.firecrawl-scrape", "arguments": {"url": url}, "call_id": scrape_call_id})
         
         try:
             scrape_result = await registry.call_tool("firecrawl.firecrawl-scrape", {"url": url})
             
             if on_event:
-                on_event("tool_call_complete", {"tool": "firecrawl.firecrawl-scrape", "result": scrape_result})
+                on_event("tool_call_complete", {"tool": "firecrawl.firecrawl-scrape", "result": scrape_result, "call_id": scrape_call_id})
             
             if scrape_result.get('success'):
                 # Extract content from result
@@ -1440,10 +1443,12 @@ async def check_and_execute_tools(user_query: str, on_event: Optional[Callable] 
     print(f"[MCP Phase 2] Executing: {final_tool_name} with args: {arguments}")
     
     # ===== Execute the tool =====
+    call_id = str(uuid.uuid4())[:8]
     if on_event:
         on_event("tool_call_start", {
             "tool": final_tool_name,
-            "arguments": arguments
+            "arguments": arguments,
+            "call_id": call_id
         })
     
     try:
@@ -1453,7 +1458,8 @@ async def check_and_execute_tools(user_query: str, on_event: Optional[Callable] 
             on_event("tool_call_complete", {
                 "tool": final_tool_name,
                 "arguments": arguments,
-                "result": result
+                "result": result,
+                "call_id": call_id
             })
         
         print(f"[MCP] Tool execution complete: success={result.get('success', False)}")
@@ -1465,7 +1471,8 @@ async def check_and_execute_tools(user_query: str, on_event: Optional[Callable] 
             on_event("tool_call_complete", {
                 "tool": final_tool_name,
                 "arguments": arguments,
-                "result": {"success": False, "error": str(e)}
+                "result": {"success": False, "error": str(e)},
+                "call_id": call_id
             })
         return None
 

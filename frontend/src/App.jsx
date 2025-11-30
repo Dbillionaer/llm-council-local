@@ -424,6 +424,10 @@ function App() {
               const messages = [...(prev?.messages || [])];
               const lastMsg = messages[messages.length - 1];
               if (!lastMsg.toolSteps) lastMsg.toolSteps = [];
+              // Check if this call_id already exists (prevent duplicates)
+              if (event.call_id && lastMsg.toolSteps.some(s => s.call_id === event.call_id)) {
+                return prev; // Skip duplicate
+              }
               // Add new step in 'running' state
               lastMsg.toolSteps = [
                 ...lastMsg.toolSteps,
@@ -432,6 +436,7 @@ function App() {
                   input: event.arguments,
                   status: 'running',
                   startTime: Date.now(),
+                  call_id: event.call_id,
                 },
               ];
               return { ...prev, messages };
@@ -444,10 +449,10 @@ function App() {
               const messages = [...(prev?.messages || [])];
               const lastMsg = messages[messages.length - 1];
               if (lastMsg.toolSteps && lastMsg.toolSteps.length > 0) {
-                // Find the running step for this tool and update it
-                const stepIndex = lastMsg.toolSteps.findIndex(
-                  (s) => s.tool === event.tool && s.status === 'running'
-                );
+                // Find the step by call_id if available, otherwise fall back to tool name match
+                const stepIndex = event.call_id
+                  ? lastMsg.toolSteps.findIndex((s) => s.call_id === event.call_id)
+                  : lastMsg.toolSteps.findIndex((s) => s.tool === event.tool && s.status === 'running');
                 if (stepIndex !== -1) {
                   const step = lastMsg.toolSteps[stepIndex];
                   const endTime = Date.now();
@@ -968,6 +973,10 @@ function App() {
             const messages = [...(prev?.messages || [])];
             const lastMsg = messages[messages.length - 1];
             if (!lastMsg.toolSteps) lastMsg.toolSteps = [];
+            // Check if this call_id already exists (prevent duplicates)
+            if (event.call_id && lastMsg.toolSteps.some(s => s.call_id === event.call_id)) {
+              return prev; // Skip duplicate
+            }
             lastMsg.toolSteps = [
               ...lastMsg.toolSteps,
               {
@@ -975,6 +984,7 @@ function App() {
                 input: event.arguments,
                 status: 'running',
                 startTime: Date.now(),
+                call_id: event.call_id,
               },
             ];
             return { ...prev, messages };
@@ -987,9 +997,10 @@ function App() {
             const messages = [...(prev?.messages || [])];
             const lastMsg = messages[messages.length - 1];
             if (lastMsg.toolSteps && lastMsg.toolSteps.length > 0) {
-              const stepIndex = lastMsg.toolSteps.findIndex(
-                (s) => s.tool === event.tool && s.status === 'running'
-              );
+              // Find the step by call_id if available, otherwise fall back to tool name match
+              const stepIndex = event.call_id
+                ? lastMsg.toolSteps.findIndex((s) => s.call_id === event.call_id)
+                : lastMsg.toolSteps.findIndex((s) => s.tool === event.tool && s.status === 'running');
               if (stepIndex !== -1) {
                 const step = lastMsg.toolSteps[stepIndex];
                 const endTime = Date.now();

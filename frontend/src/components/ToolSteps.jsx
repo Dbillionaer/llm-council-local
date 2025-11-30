@@ -19,9 +19,9 @@ export default function ToolSteps({ toolSteps = [], currentStep = null }) {
   const [expandedSteps, setExpandedSteps] = useState({});
   const [hoveredStep, setHoveredStep] = useState(null);
 
-  // Combine completed steps with current step
+  // Combine completed steps with current step (use call_id to avoid duplicates)
   const allSteps = currentStep 
-    ? [...toolSteps.filter(s => s.tool !== currentStep.tool), currentStep]
+    ? [...toolSteps.filter(s => s.call_id !== currentStep.call_id), currentStep]
     : toolSteps;
 
   if (allSteps.length === 0) {
@@ -102,7 +102,7 @@ export default function ToolSteps({ toolSteps = [], currentStep = null }) {
         <div className="tool-steps-content">
           {allSteps.map((step, index) => (
             <div 
-              key={`${step.tool}-${index}`}
+              key={step.call_id || `${step.tool}-${index}`}
               className={`tool-step ${step.status || 'complete'}`}
               onMouseEnter={() => setHoveredStep(index)}
               onMouseLeave={() => setHoveredStep(null)}

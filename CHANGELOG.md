@@ -4,6 +4,23 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.30.13
+**Branch:** `v0.30.13`  
+**Completed:** 2025-11-30 06:10 UTC | 2025-11-29 22:10 PST
+
+**Bug Fixes:**
+- **Duplicate tool steps display fix**: Added unique call_id to tool call events
+  - Each tool call now has a UUID-based call_id for precise tracking
+  - Frontend uses call_id to prevent duplicate entries and match start/complete events
+  - Allows same tool to be called multiple times without confusion
+
+**Changes:**
+- `backend/council.py` - Added call_id to tool_call_start/complete events
+- `frontend/src/App.jsx` - Updated event handlers to use call_id for deduplication
+- `frontend/src/components/ToolSteps.jsx` - Use call_id for React keys and filtering
+
+---
+
 ### v0.30.12
 **Branch:** `v0.30.12`  
 **Completed:** 2025-11-30 06:06 UTC | 2025-11-29 22:06 PST

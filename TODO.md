@@ -5,9 +5,10 @@ This file tracks pending changes organized by priority. AI agents should process
 ## Current
 <!-- Items actively being worked on. Maximum 3 items. -->
 
-- [ ] **[FIX]** Duplicate tool query display in ToolSteps
-  - Same tool/query shown twice in tool steps UI
-  - Related: frontend/src/components/ToolSteps.jsx
+- [ ] **[FIX]** Thinking mode auto-scroll within text area
+  - Auto-scroll to bottom while thoughts streaming
+  - Disable if user scrolls up within that element
+  - Related: frontend/src/components/Stage*.jsx
 
 ## Next
 <!-- Items queued for implementation after Current is complete. Maximum 5 items. -->
@@ -16,11 +17,6 @@ This file tracks pending changes organized by priority. AI agents should process
   - Show 🧠 message with details when Graphiti MCP is used
   - Needs backend event emission for memory operations
   - Related: backend/memory_service.py, frontend/src/App.jsx
-
-- [ ] **[FIX]** Thinking mode auto-scroll within text area
-  - Auto-scroll to bottom while thoughts streaming
-  - Disable if user scrolls up within that element
-  - Related: frontend/src/components/Stage*.jsx
 
 ## Future
 <!-- Ideas and enhancements for later consideration. No limit. -->
