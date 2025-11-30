@@ -258,11 +258,50 @@ export default function ChatInterface({
                       <span className={`classification-badge ${msg.classification.type || 'unknown'}`}>
                         {msg.classification.status === 'classifying' ? '🔍 Classifying...' : 
                          msg.classification.status === 'complete' ? 
-                           (msg.responseType === 'direct' ? '⚡ Direct' : '🤔 Deliberation') :
+                           (msg.responseType === 'direct' ? '⚡ Direct' : 
+                            msg.responseType === 'memory' ? '🧠 Memory' : '🤔 Deliberation') :
                            '🔍 Classifying...'}
                       </span>
                     )}
+                    {msg.memoryStatus && msg.memoryStatus.status === 'used' && (
+                      <span className="memory-badge used" title={`Confidence: ${(msg.memoryStatus.confidence * 100).toFixed(0)}%`}>
+                        🧠 Memory Used
+                      </span>
+                    )}
                   </div>
+
+                  {/* Memory status indicator */}
+                  {msg.memoryStatus && (
+                    <div className={`memory-status ${msg.memoryStatus.status}`}>
+                      {msg.memoryStatus.status === 'searching' && (
+                        <span className="memory-searching">🧠 Searching memories...</span>
+                      )}
+                      {msg.memoryStatus.status === 'found' && msg.memoryStatus.count > 0 && (
+                        <span className="memory-found">
+                          🧠 Found {msg.memoryStatus.count} relevant {msg.memoryStatus.count === 1 ? 'memory' : 'memories'}
+                          {msg.memoryStatus.confidence !== undefined && (
+                            <span className="memory-confidence">
+                              {' '}(confidence: {(msg.memoryStatus.confidence * 100).toFixed(0)}%)
+                            </span>
+                          )}
+                        </span>
+                      )}
+                      {msg.memoryStatus.status === 'used' && (
+                        <details className="memory-details">
+                          <summary>🧠 Memory-based response (confidence: {(msg.memoryStatus.confidence * 100).toFixed(0)}%)</summary>
+                          <div className="memory-info">
+                            <div>Found {msg.memoryStatus.count} relevant memories</div>
+                            <div>Threshold: {(msg.memoryStatus.threshold * 100).toFixed(0)}%</div>
+                          </div>
+                        </details>
+                      )}
+                      {msg.memoryStatus.status === 'not_used' && msg.memoryStatus.count > 0 && (
+                        <span className="memory-not-used">
+                          🧠 {msg.memoryStatus.count} memories found but not used (confidence: {(msg.memoryStatus.confidence * 100).toFixed(0)}% &lt; {(msg.memoryStatus.threshold * 100).toFixed(0)}%)
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Classification indicator - show details when complete */}
                   {msg.classification?.status === 'classifying' && (

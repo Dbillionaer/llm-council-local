@@ -271,6 +271,73 @@ function App() {
             });
             break;
 
+          case 'memory_check_start':
+            // Memory check started
+            setCurrentConversation((prev) => {
+              const messages = [...(prev?.messages || [])];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.memoryStatus = { status: 'searching', query: event.query };
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'memory_search_complete':
+            // Memory search returned results
+            setCurrentConversation((prev) => {
+              const messages = [...(prev?.messages || [])];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.memoryStatus = {
+                ...lastMsg.memoryStatus,
+                status: 'found',
+                count: event.count,
+                memories: event.memories
+              };
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'memory_confidence_calculated':
+            // Memory confidence score calculated
+            setCurrentConversation((prev) => {
+              const messages = [...(prev?.messages || [])];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.memoryStatus = {
+                ...lastMsg.memoryStatus,
+                confidence: event.confidence,
+                threshold: event.threshold,
+                willUse: event.confidence >= event.threshold
+              };
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'memory_response_generated':
+            // Memory-based response used
+            setCurrentConversation((prev) => {
+              const messages = [...(prev?.messages || [])];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.memoryStatus = {
+                ...lastMsg.memoryStatus,
+                status: 'used',
+                response: event.response
+              };
+              lastMsg.responseType = 'memory';
+              return { ...prev, messages };
+            });
+            break;
+
+          case 'memory_check_complete':
+            // Memory check finished (may or may not have been used)
+            setCurrentConversation((prev) => {
+              const messages = [...(prev?.messages || [])];
+              const lastMsg = messages[messages.length - 1];
+              if (lastMsg.memoryStatus && lastMsg.memoryStatus.status !== 'used') {
+                lastMsg.memoryStatus.status = event.used ? 'used' : 'not_used';
+              }
+              return { ...prev, messages };
+            });
+            break;
+
           case 'direct_response_start':
             // Direct response path (no deliberation)
             setCurrentConversation((prev) => {
@@ -816,6 +883,68 @@ function App() {
             const messages = [...(prev?.messages || [])];
             const lastMsg = messages[messages.length - 1];
             lastMsg.classification = event.classification;
+            return { ...prev, messages };
+          });
+          break;
+
+        case 'memory_check_start':
+          setCurrentConversation((prev) => {
+            const messages = [...(prev?.messages || [])];
+            const lastMsg = messages[messages.length - 1];
+            lastMsg.memoryStatus = { status: 'searching', query: event.query };
+            return { ...prev, messages };
+          });
+          break;
+
+        case 'memory_search_complete':
+          setCurrentConversation((prev) => {
+            const messages = [...(prev?.messages || [])];
+            const lastMsg = messages[messages.length - 1];
+            lastMsg.memoryStatus = {
+              ...lastMsg.memoryStatus,
+              status: 'found',
+              count: event.count,
+              memories: event.memories
+            };
+            return { ...prev, messages };
+          });
+          break;
+
+        case 'memory_confidence_calculated':
+          setCurrentConversation((prev) => {
+            const messages = [...(prev?.messages || [])];
+            const lastMsg = messages[messages.length - 1];
+            lastMsg.memoryStatus = {
+              ...lastMsg.memoryStatus,
+              confidence: event.confidence,
+              threshold: event.threshold,
+              willUse: event.confidence >= event.threshold
+            };
+            return { ...prev, messages };
+          });
+          break;
+
+        case 'memory_response_generated':
+          setCurrentConversation((prev) => {
+            const messages = [...(prev?.messages || [])];
+            const lastMsg = messages[messages.length - 1];
+            lastMsg.memoryStatus = {
+              ...lastMsg.memoryStatus,
+              status: 'used',
+              response: event.response
+            };
+            lastMsg.responseType = 'memory';
+            return { ...prev, messages };
+          });
+          break;
+
+        case 'memory_check_complete':
+          setCurrentConversation((prev) => {
+            const messages = [...(prev?.messages || [])];
+            const lastMsg = messages[messages.length - 1];
+            if (lastMsg.memoryStatus && lastMsg.memoryStatus.status !== 'used') {
+              lastMsg.memoryStatus.status = event.used ? 'used' : 'not_used';
+            }
             return { ...prev, messages };
           });
           break;

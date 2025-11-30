@@ -4,6 +4,26 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.33.0
+**Branch:** `v0.33.0`  
+**Completed:** 2025-11-30 09:25 UTC | 2025-11-30 01:25 PST
+
+**Features:**
+- **Graphiti brain emoji indicator**: Shows 🧠 memory status in chat interface
+  - Displays "🧠 Searching memories..." while checking Graphiti
+  - Shows memory count and confidence score when found
+  - "🧠 Memory Used" badge when memory-based response generated
+  - "🧠 Memory-based response" with expandable details
+  - Confidence percentage displayed for transparency
+  - Handles all memory states: searching, found, used, not_used
+
+**Changes:**
+- `frontend/src/App.jsx` - Added memory event handlers for all memory status events
+- `frontend/src/components/ChatInterface.jsx` - Added memory status UI display
+- `frontend/src/components/ChatInterface.css` - Added memory status styling
+
+---
+
 ### v0.32.5
 **Branch:** `v0.32.5`  
 **Completed:** 2025-11-30 08:35 UTC | 2025-11-30 00:35 PST

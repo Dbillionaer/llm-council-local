@@ -5,15 +5,10 @@ This file tracks pending changes organized by priority. AI agents should process
 ## Current
 <!-- Items actively being worked on. Maximum 3 items. -->
 
-(No current fixes - all done!)
+(No current items)
 
 ## Next
 <!-- Items queued for implementation after Current is complete. Maximum 5 items. -->
-
-- [ ] **[FEATURE]** Graphiti brain emoji indicator
-  - Show 🧠 message with details when Graphiti MCP is used
-  - Needs backend event emission for memory operations
-  - Related: backend/memory_service.py, frontend/src/App.jsx
 
 ## Future
 <!-- Ideas and enhancements for later consideration. No limit. -->
