@@ -46,6 +46,36 @@ def get_memory_context() -> str:
         return ""
 
 
+def get_time_of_day_greeting() -> str:
+    """
+    Get an appropriate greeting based on current time of day.
+    Returns a greeting phrase like "Good morning" or "Good evening".
+    """
+    hour = datetime.now().hour
+    if 5 <= hour < 12:
+        return "Good morning"
+    elif 12 <= hour < 17:
+        return "Good afternoon"
+    elif 17 <= hour < 21:
+        return "Good evening"
+    else:
+        return "Hello"  # Late night/early morning
+
+
+def get_time_context_string() -> str:
+    """
+    Build a rich time context string including time-of-day greeting guidance.
+    """
+    current_time = datetime.now()
+    greeting = get_time_of_day_greeting()
+    
+    return f"""Current date: {current_time.strftime('%B %d, %Y')} ({current_time.strftime('%A')})
+Current time: {current_time.strftime('%H:%M')} (local time)
+Appropriate greeting: {greeting}
+
+When greeting the user, use time-appropriate greetings (e.g., "{greeting}" instead of just "Hello")."""
+
+
 # ============== Response Post-Processing ==============
 
 def strip_fake_images(text: str) -> str:
@@ -360,12 +390,15 @@ Question: {user_query}
 The tool failed to retrieve the requested information. Be honest about this failure.
 Do NOT fabricate or make up data. Explain what went wrong and suggest the user try again later."""
     else:
+        # No tool data - include rich time context for greetings/chat
+        rich_time_context = get_time_context_string()
         prompt = f"""Answer this question directly and concisely.
 
 Question: {user_query}
-({time_context})
 
-Provide a helpful, accurate answer. Be concise but complete."""
+{rich_time_context}
+
+Provide a helpful, accurate answer. Be conversational and concise."""
     
     # Build messages with optional system message
     # Prepend memory context (AI/user names) if available

@@ -44,6 +44,12 @@
       "description": "Returns list of time zones from the tz database"
     },
     {
+      "name": "weather",
+      "command": ["python3", "-m", "mcp_servers.weather.server"],
+      "port": null,
+      "description": "Current weather conditions - temperature, precipitation, wind, humidity, and forecast"
+    },
+    {
       "name": "sequential-thinking",
       "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
       "transport": "stdio",

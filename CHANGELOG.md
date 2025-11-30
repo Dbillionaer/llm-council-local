@@ -4,6 +4,32 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.38.0
+**Branch:** `v0.38.0`  
+**Completed:** 2025-11-30 16:50 UTC | 2025-11-30 08:50 PST
+
+**Features:**
+- **Time-Aware Greetings**: Greetings now use appropriate time-of-day phrases
+  - Added `get_time_of_day_greeting()` function: "Good morning" (5am-12pm), "Good afternoon" (12pm-5pm), "Good evening" (5pm-9pm), "Hello" (late night)
+  - Added `get_time_context_string()` function: Rich time context with greeting guidance
+  - Direct responses (factual/chat) now include time-appropriate greeting hints in system prompt
+  
+- **Weather MCP Server**: New tool for retrieving current weather conditions
+  - Created `mcp_servers/weather/server.py` with `get-current-weather` tool
+  - Uses Open-Meteo API (free, no authentication required)
+  - Returns temperature, humidity, wind, precipitation, and contextual advisories
+  - IP-based geolocation for automatic location detection
+  - Registered in `mcp_servers.json`
+
+**Technical Details:**
+- `backend/council.py` - Added `get_time_of_day_greeting()` and `get_time_context_string()` functions
+- `backend/council.py` - Updated `chairman_direct_response()` to use rich time context for chat messages
+- `mcp_servers/weather/__init__.py` - New package init
+- `mcp_servers/weather/server.py` - New weather MCP server
+- `mcp_servers.json` - Added weather server configuration
+
+---
+
 ### v0.37.0
 **Branch:** `v0.37.0`  
 **Completed:** 2025-11-30 16:30 UTC | 2025-11-30 08:30 PST

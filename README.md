@@ -17,7 +17,20 @@ In a bit more detail, here is what happens when you submit a query:
 
 ## Key Features
 
-### Current Release (v0.37.0)
+### Current Release (v0.38.0)
+- **Time-Aware Greetings**: Greetings now use appropriate time-of-day phrases
+  - "Good morning" (5am-12pm), "Good afternoon" (12pm-5pm), "Good evening" (5pm-9pm)
+  - Greeting context included in system prompt for all chat responses
+  - More natural and contextual interactions
+  
+- **Weather MCP Server**: New tool for retrieving current weather conditions
+  - Temperature, humidity, wind speed, precipitation status
+  - Uses Open-Meteo API (free, no authentication required)
+  - IP-based geolocation for automatic location detection
+  - Returns contextual advisories (e.g., "Cold - dress warmly", "Strong winds - be careful")
+  - Tool: `get-current-weather`
+
+### Previous Release (v0.37.0)
 - **Personality Introspection via Council Deliberation**: When asked personal questions (feelings, preferences, favorite things, etc.) with no existing memory, the system routes to full council deliberation
   - Detects personal questions about feelings, preferences, state, and identity
   - Checks memory for existing personality data before routing
