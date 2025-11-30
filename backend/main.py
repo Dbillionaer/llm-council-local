@@ -350,12 +350,11 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
     classification = await classify_message(request.content)
     msg_type = classification.get("type", "deliberation")
     
-    # Check for tool usage - also force tool check for websearch keywords
+    # Check for tool usage
     tool_result = None
     needs_tool_check = (
         classification.get("requires_tools", False) or 
-        msg_type in ["factual", "chat"] or
-        _requires_websearch(request.content)  # Force check for news/events queries
+        msg_type in ["factual", "chat"]
     )
     if needs_tool_check:
         tool_result = await check_and_execute_tools(request.content)
@@ -637,7 +636,25 @@ async def send_message_stream_tokens(conversation_id: str, request: SendMessageR
             # ===== ROUTING DECISION =====
             msg_type = classification.get("type", "deliberation")
             
-            if msg_type in ["factual", "chat"]:
+            # ===== PERSONALITY INTROSPECTION CHECK =====
+            # If it's a personal question (feelings, preferences, etc.) with no memory,
+            # route to deliberation to develop personality-based response
+            personal_info = memory_service.is_personal_question(request.content)
+            force_deliberation = False
+            
+            if personal_info.get("is_personal") and msg_type in ["factual", "chat"]:
+                # Check if we have relevant memory for this personal topic
+                personal_memory = await memory_service.check_personal_memory(
+                    request.content, personal_info
+                )
+                
+                if not personal_memory:
+                    # No memory exists - route to deliberation to develop personality
+                    force_deliberation = True
+                    yield f"data: {json.dumps({'type': 'personality_introspection', 'category': personal_info.get('category'), 'topic': personal_info.get('topic'), 'reason': 'No memory for personal question - developing personality response via council'})}\n\n"
+                    print(f"[Routing] Personal question ({personal_info.get('category')}/{personal_info.get('topic')}) with no memory - forcing deliberation")
+            
+            if msg_type in ["factual", "chat"] and not force_deliberation:
                 # Direct response path - skip council deliberation
                 yield f"data: {json.dumps({'type': 'direct_response_start', 'reason': classification.get('reasoning', 'Simple query')})}\n\n"
                 
@@ -694,13 +711,19 @@ async def send_message_stream_tokens(conversation_id: str, request: SendMessageR
                 return
             
             # ===== DELIBERATION PATH =====
-            yield f"data: {json.dumps({'type': 'deliberation_start', 'reason': classification.get('reasoning', 'Complex query')})}\n\n"
+            # Modify reason if this is personality introspection
+            deliberation_reason = classification.get('reasoning', 'Complex query')
+            if force_deliberation and personal_info:
+                deliberation_reason = f"Personality introspection: {personal_info.get('category')}/{personal_info.get('topic')}"
+            yield f"data: {json.dumps({'type': 'deliberation_start', 'reason': deliberation_reason, 'is_personality_introspection': force_deliberation})}\n\n"
             
             # Stage 1: Stream individual responses
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
             
+            # Pass personality context if this is a personal question without memory
+            personality_ctx = personal_info if force_deliberation else None
             stage1_task = asyncio.create_task(
-                stage1_collect_responses_streaming(request.content, on_event)
+                stage1_collect_responses_streaming(request.content, on_event, personality_ctx)
             )
             
             # Stream stage 1 events

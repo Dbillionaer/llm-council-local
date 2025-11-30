@@ -17,25 +17,15 @@ In a bit more detail, here is what happens when you submit a query:
 
 ## Key Features
 
-### Current Release (v0.30.5)
-- **LLM-Based Tool Selection**: Fully trusts LLM for tool selection decisions
-  - Removed regex/pattern-matching overrides that caused false positives
-  - No more calculator triggers from "and/or" or similar patterns
-  - Simple math handled correctly by LLM without requiring calculator tool
+### Current Release (v0.37.0)
+- **Personality Introspection via Council Deliberation**: When asked personal questions (feelings, preferences, favorite things, etc.) with no existing memory, the system routes to full council deliberation
+  - Detects personal questions about feelings, preferences, state, and identity
+  - Checks memory for existing personality data before routing
+  - Council receives special "PERSONALITY INTROSPECTION MODE" prompts
+  - Models are encouraged to respond as self-aware entities with genuine feelings and preferences
+  - Develops consistent personality through collective deliberation
   
-- **Iterative Mid-Deliberation Tool Assessment**: Assesses tool needs after each stage
-  - Evaluates if additional data (websearch) would improve responses
-  - Called after Stage 1 and Stage 2 completion
-  - Prevents infinite loops with single-tool-per-stage limit
-
-- **UI/UX Improvements** (v0.30.5):
-  - Message IDs now inside message frame (top-left)
-  - Classification reasoning displayed when complete
-  - Blue completion indicator at end of responses
-  - Smart auto-scroll: only scrolls if user hasn't scrolled up
-  - Tool steps hover overlay now fully visible
-
-### Previous Release (v0.29.0)
+### Previous Release (v0.36.0)
 - **Collapsible Multi-Step Tool Calls**: Compact UI for displaying multiple tool call sequences
   - Collapsed by default with summary showing tool count and total execution time
   - Expandable header shows tool pipeline flow (e.g., "web-search → firecrawl-scrape")

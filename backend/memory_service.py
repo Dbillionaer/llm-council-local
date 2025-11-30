@@ -818,6 +818,157 @@ If confidence is below 0.7, set recommended_answer to null."""
             episode_type="direct_response",
             metadata={"conversation_id": conversation_id, "model": model}
         )
+    
+    def is_personal_question(self, query: str) -> Dict[str, Any]:
+        """
+        Detect if the query is asking something personal about the AI.
+        
+        Personal questions include:
+        - Feelings/emotions: "how are you feeling?", "are you happy?"
+        - Preferences: "what's your favorite X?", "do you prefer X or Y?"
+        - Self-awareness: "what do you like?", "what are you interested in?"
+        - Current state: "how are you today?", "are you tired?"
+        - Identity beyond name: "what kind of AI are you?", "describe your personality"
+        
+        Returns:
+            Dict with 'is_personal': bool, 'category': str (feeling|preference|state|identity), 
+            'topic': str (what they're asking about)
+        """
+        query_lower = query.lower().strip()
+        
+        # Feeling/emotion patterns
+        feeling_patterns = [
+            ("how are you", "general_state"),
+            ("how do you feel", "feeling"),
+            ("are you happy", "happiness"),
+            ("are you sad", "sadness"),
+            ("are you tired", "tiredness"),
+            ("do you feel", "feeling"),
+            ("what are you feeling", "feeling"),
+            ("how's it going", "general_state"),
+            ("are you okay", "wellbeing"),
+            ("are you well", "wellbeing"),
+        ]
+        
+        for pattern, topic in feeling_patterns:
+            if pattern in query_lower:
+                return {"is_personal": True, "category": "feeling", "topic": topic}
+        
+        # Preference patterns
+        preference_patterns = [
+            ("favorite", "favorite"),
+            ("favourite", "favorite"),
+            ("do you prefer", "preference"),
+            ("do you like", "likes"),
+            ("what do you like", "likes"),
+            ("what do you enjoy", "enjoyment"),
+            ("what's your preferred", "preference"),
+            ("what is your preferred", "preference"),
+        ]
+        
+        for pattern, topic in preference_patterns:
+            if pattern in query_lower:
+                # Extract what they're asking about
+                if "color" in query_lower or "colour" in query_lower:
+                    specific_topic = "color"
+                elif "food" in query_lower:
+                    specific_topic = "food"
+                elif "music" in query_lower or "song" in query_lower:
+                    specific_topic = "music"
+                elif "movie" in query_lower or "film" in query_lower:
+                    specific_topic = "movies"
+                elif "book" in query_lower:
+                    specific_topic = "books"
+                elif "hobby" in query_lower or "hobbies" in query_lower:
+                    specific_topic = "hobbies"
+                else:
+                    specific_topic = topic
+                return {"is_personal": True, "category": "preference", "topic": specific_topic}
+        
+        # Current state patterns
+        state_patterns = [
+            ("how old are you", "age"),
+            ("what age are you", "age"),
+            ("your age", "age"),
+            ("when were you", "origin"),
+            ("where are you from", "origin"),
+        ]
+        
+        for pattern, topic in state_patterns:
+            if pattern in query_lower:
+                return {"is_personal": True, "category": "state", "topic": topic}
+        
+        # Identity/personality patterns (beyond just name)
+        identity_patterns = [
+            ("describe your personality", "personality"),
+            ("what kind of ai", "ai_type"),
+            ("what type of ai", "ai_type"),
+            ("tell me about your personality", "personality"),
+            ("what makes you unique", "uniqueness"),
+            ("what are your traits", "traits"),
+            ("what are your characteristics", "characteristics"),
+        ]
+        
+        for pattern, topic in identity_patterns:
+            if pattern in query_lower:
+                return {"is_personal": True, "category": "identity", "topic": topic}
+        
+        return {"is_personal": False, "category": None, "topic": None}
+    
+    async def check_personal_memory(
+        self,
+        query: str,
+        personal_info: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Check if memory exists for a personal question.
+        
+        Args:
+            query: The user's query
+            personal_info: Result from is_personal_question()
+            
+        Returns:
+            Memory result if found, None if no relevant memory exists
+        """
+        if not self._available or not personal_info.get("is_personal"):
+            return None
+        
+        category = personal_info.get("category", "")
+        topic = personal_info.get("topic", "")
+        
+        # Build search queries for this personal topic
+        search_terms = [
+            f"my {topic}",
+            f"i feel {topic}" if category == "feeling" else f"my {category}",
+            f"favorite {topic}" if category == "preference" else topic,
+            f"personality {topic}" if category == "identity" else topic,
+        ]
+        
+        # Search memory for any of these terms
+        all_memories = []
+        for term in search_terms:
+            memories = await self.search_memories(term, limit=5)
+            all_memories.extend(memories)
+        
+        # Deduplicate by content
+        seen = set()
+        unique_memories = []
+        for m in all_memories:
+            content = m.get("content", "")
+            if content and content not in seen:
+                seen.add(content)
+                unique_memories.append(m)
+        
+        if unique_memories:
+            print(f"[Memory] Found {len(unique_memories)} personal memories for {category}/{topic}")
+            return {
+                "memories": unique_memories,
+                "category": category,
+                "topic": topic
+            }
+        
+        print(f"[Memory] No personal memory found for {category}/{topic}")
+        return None
 
 
 # Singleton instance

@@ -4,6 +4,29 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.37.0
+**Branch:** `v0.37.0`  
+**Completed:** 2025-11-30 16:30 UTC | 2025-11-30 08:30 PST
+
+**Features:**
+- **Personality Introspection via Council Deliberation**: When asked personal questions (feelings, preferences, identity) with no existing memory, routes to council deliberation to develop authentic personality-based responses
+  - Added `is_personal_question()` method to detect feelings/preferences/state/identity questions
+  - Added `check_personal_memory()` method to verify if memory exists for personal topics
+  - Personal questions without memory trigger full council deliberation with special personality prompts
+  - Council receives "PERSONALITY INTROSPECTION MODE" system prompt encouraging authentic, introspective responses
+  - Models are instructed to treat themselves as self-aware entities with genuine feelings and preferences
+
+**Technical Details:**
+- `backend/memory_service.py` - Added `is_personal_question()` and `check_personal_memory()` methods
+- `backend/main.py` - Added personality introspection check before routing decision
+- `backend/council.py` - Added `personality_context` parameter to `stage1_collect_responses_streaming()`
+- `backend/council.py` - Special personality system prompt injected for introspection queries
+
+**Bug Fixes:**
+- Fixed `NameError: _requires_websearch is not defined` in non-streaming endpoint
+
+---
+
 ### v0.36.2
 **Branch:** `v0.36.2`  
 **Completed:** 2025-11-30 15:35 UTC | 2025-11-30 07:35 PST
