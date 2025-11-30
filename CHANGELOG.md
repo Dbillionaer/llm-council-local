@@ -4,6 +4,21 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.32.3
+**Branch:** `v0.32.3`  
+**Completed:** 2025-11-30 07:34 UTC | 2025-11-29 23:34 PST
+
+**Bug Fixes:**
+- **Title generation sidebar update**: Fixed WebSocket message parsing for real-time title updates
+  - Title was at top level of message, not nested in `data` object
+  - Sidebar now updates immediately when title generation completes
+  - No manual page refresh required
+
+**Changes:**
+- `frontend/src/App.jsx` - Fixed destructuring of WebSocket title_progress message
+
+---
+
 ### v0.32.2
 **Branch:** `v0.32.2`  
 **Completed:** 2025-11-30 07:04 UTC | 2025-11-29 23:04 PST

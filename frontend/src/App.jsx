@@ -76,23 +76,23 @@ function App() {
         const update = JSON.parse(event.data);
         
         if (update.type === 'title_progress') {
-          const { conversation_id, status, data } = update;
+          const { conversation_id, status, title, thinking, ...rest } = update;
           
           // Update title generation status
           setTitleGenerationStatus(prev => ({
             ...prev,
             [conversation_id]: {
               status,
-              data: data || {},
+              data: { title, thinking, ...rest },
               timestamp: update.timestamp
             }
           }));
           
           // Update conversation title if completed
-          if (status === 'complete_immediate' && data?.title) {
+          if (status === 'complete_immediate' && title) {
             setConversations(prev => prev.map(conv => 
               conv.id === conversation_id 
-                ? { ...conv, title: data.title }
+                ? { ...conv, title: title }
                 : conv
             ));
             
@@ -100,7 +100,7 @@ function App() {
             if (currentConversationId === conversation_id && currentConversation) {
               setCurrentConversation(prev => ({
                 ...prev,
-                title: data.title
+                title: title
               }));
             }
           }
