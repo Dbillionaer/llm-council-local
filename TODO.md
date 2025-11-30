@@ -5,10 +5,7 @@ This file tracks pending changes organized by priority. AI agents should process
 ## Current
 <!-- Items actively being worked on. Maximum 3 items. -->
 
-- [ ] **[FIX]** Thinking mode auto-scroll within text area
-  - Auto-scroll to bottom while thoughts streaming
-  - Disable if user scrolls up within that element
-  - Related: frontend/src/components/Stage*.jsx
+(No current fixes - all done!)
 
 ## Next
 <!-- Items queued for implementation after Current is complete. Maximum 5 items. -->

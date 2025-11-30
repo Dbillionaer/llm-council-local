@@ -1,7 +1,11 @@
+import { useRef, useEffect } from 'react';
 import MarkdownRenderer from './MarkdownRenderer';
 import './Stage3.css';
 
 export default function Stage3({ finalResponse, streaming, isDirect = false }) {
+  const thinkingRef = useRef(null);
+  const userScrolledRef = useRef(false);
+
   // Use completed response if available, otherwise show streaming content
   const displayContent = finalResponse?.response || streaming?.content || '';
   const thinkingContent = streaming?.thinking || '';
@@ -10,6 +14,31 @@ export default function Stage3({ finalResponse, streaming, isDirect = false }) {
   const tokensPerSecond = streaming?.tokensPerSecond;
   const thinkingSeconds = streaming?.thinkingSeconds;
   const elapsedSeconds = streaming?.elapsedSeconds;
+
+  // Auto-scroll thinking content while streaming (unless user scrolled up)
+  useEffect(() => {
+    if (thinkingRef.current && isStreaming && thinkingContent && !userScrolledRef.current) {
+      thinkingRef.current.scrollTop = thinkingRef.current.scrollHeight;
+    }
+  }, [thinkingContent, isStreaming]);
+
+  // Reset user scroll flag when streaming stops
+  useEffect(() => {
+    if (!isStreaming) {
+      userScrolledRef.current = false;
+    }
+  }, [isStreaming]);
+
+  // Handle scroll in thinking content
+  const handleThinkingScroll = (e) => {
+    const el = e.target;
+    const isAtBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 20;
+    if (!isAtBottom) {
+      userScrolledRef.current = true;
+    } else {
+      userScrolledRef.current = false;
+    }
+  };
 
   // Format timing as "thinking/total"
   const formatTiming = (thinking, elapsed) => {
@@ -38,7 +67,11 @@ export default function Stage3({ finalResponse, streaming, isDirect = false }) {
         {thinkingContent && (
           <details className="thinking-section" open={isStreaming}>
             <summary>Thinking</summary>
-            <div className="thinking-content">
+            <div 
+              className="thinking-content"
+              ref={thinkingRef}
+              onScroll={handleThinkingScroll}
+            >
               {thinkingContent}
             </div>
           </details>

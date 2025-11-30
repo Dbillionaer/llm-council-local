@@ -4,6 +4,24 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.32.2
+**Branch:** `v0.32.2`  
+**Completed:** 2025-11-30 07:04 UTC | 2025-11-29 23:04 PST
+
+**Bug Fixes:**
+- **Thinking mode auto-scroll**: Added auto-scroll to bottom while thoughts streaming
+  - Automatically scrolls thinking content as new tokens arrive
+  - Stops auto-scrolling if user scrolls up (respects user control)
+  - Resumes auto-scrolling when user scrolls back to bottom
+  - Applied to all three stage components (Stage1, Stage2, Stage3)
+
+**Changes:**
+- `frontend/src/components/Stage1.jsx` - Added thinkingRef, userScrolledRef, auto-scroll effect
+- `frontend/src/components/Stage2.jsx` - Added thinkingRef, userScrolledRef, auto-scroll effect
+- `frontend/src/components/Stage3.jsx` - Added thinkingRef, userScrolledRef, auto-scroll effect
+
+---
+
 ### v0.32.1
 **Branch:** `v0.32.1`  
 **Completed:** 2025-11-30 06:58 UTC | 2025-11-29 22:58 PST

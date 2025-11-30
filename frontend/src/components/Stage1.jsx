@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import MarkdownRenderer from './MarkdownRenderer';
 import './Stage1.css';
 
 export default function Stage1({ responses, streaming }) {
   const [activeTab, setActiveTab] = useState(0);
+  const thinkingRef = useRef(null);
+  const userScrolledRef = useRef(false);
 
   // Get models from either completed responses or streaming state
   const models = responses?.length > 0 
@@ -25,6 +27,29 @@ export default function Stage1({ responses, streaming }) {
   const tokensPerSecond = streamingData?.tokensPerSecond;
   const thinkingSeconds = streamingData?.thinkingSeconds;
   const elapsedSeconds = streamingData?.elapsedSeconds;
+
+  // Auto-scroll thinking content while streaming (unless user scrolled up)
+  useEffect(() => {
+    if (thinkingRef.current && isStreaming && thinkingContent && !userScrolledRef.current) {
+      thinkingRef.current.scrollTop = thinkingRef.current.scrollHeight;
+    }
+  }, [thinkingContent, isStreaming]);
+
+  // Reset user scroll flag when streaming stops or model changes
+  useEffect(() => {
+    userScrolledRef.current = false;
+  }, [currentModel, isStreaming]);
+
+  // Handle scroll in thinking content
+  const handleThinkingScroll = (e) => {
+    const el = e.target;
+    const isAtBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 20;
+    if (!isAtBottom) {
+      userScrolledRef.current = true;
+    } else {
+      userScrolledRef.current = false;
+    }
+  };
 
   // Format timing as "thinking/total"
   const formatTiming = (thinking, elapsed) => {
@@ -74,7 +99,11 @@ export default function Stage1({ responses, streaming }) {
             {thinkingContent && (
               <details className="thinking-section" open={isStreaming}>
                 <summary>Thinking</summary>
-                <div className="thinking-content">
+                <div 
+                  className="thinking-content"
+                  ref={thinkingRef}
+                  onScroll={handleThinkingScroll}
+                >
                   {thinkingContent}
                 </div>
               </details>
