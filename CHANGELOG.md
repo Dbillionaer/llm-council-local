@@ -4,6 +4,23 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.34.1
+**Branch:** `v0.34.1`  
+**Completed:** 2025-11-30 11:52 UTC | 2025-11-30 03:52 PST
+
+**Bug Fixes:**
+- **Memory search semantic expansion**: Improved memory retrieval for related queries
+  - Expands search queries with semantic variations for better matching
+  - "what is your name?" now finds "shall be known as Aether"
+  - Deduplicates results across expanded queries using UUID tracking
+  - Handles common query patterns: name/identity, preferences, descriptions
+  - Reference: conversation 0a792fba (name query didn't find identity memory)
+
+**Changes:**
+- `backend/memory_service.py` - Added `expand_search_query()` method and integrated into search
+
+---
+
 ### v0.34.0
 **Branch:** `v0.34.0`  
 **Completed:** 2025-11-30 10:40 UTC | 2025-11-30 02:40 PST

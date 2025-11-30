@@ -180,6 +180,48 @@ Types (comma-separated):"""
             groups.append(f"{MEMORY_GROUP_PREFIX}_{type_name}")
         return groups
     
+    async def expand_search_query(self, query: str) -> List[str]:
+        """
+        Expand a search query into multiple related queries for better memory retrieval.
+        
+        Args:
+            query: Original search query
+            
+        Returns:
+            List of expanded queries including the original
+        """
+        expanded = [query]
+        
+        # Add semantic expansions for common question types
+        query_lower = query.lower()
+        
+        # Name-related queries
+        if any(phrase in query_lower for phrase in ["your name", "what's your name", "who are you", "what are you called"]):
+            expanded.extend([
+                "name identity called known as",
+                "shall be known as",
+                "my name is",
+                "you are called",
+                "identity name"
+            ])
+        
+        # Identity/description queries
+        if any(phrase in query_lower for phrase in ["about yourself", "describe yourself", "who are you", "what are you"]):
+            expanded.extend([
+                "identity description personality",
+                "i am a",
+                "characteristics traits"
+            ])
+        
+        # Preference queries
+        if any(phrase in query_lower for phrase in ["prefer", "like", "favorite", "favourite"]):
+            expanded.extend([
+                "preference favorite likes dislikes",
+                "prefers wants likes"
+            ])
+        
+        return expanded
+    
     async def record_episode(
         self,
         content: str,
@@ -254,6 +296,7 @@ Types (comma-separated):"""
     ) -> List[Dict[str, Any]]:
         """
         Search for related memories across all memory type groups.
+        Uses expanded queries for better semantic matching.
         
         Args:
             query: Search query
@@ -266,79 +309,92 @@ Types (comma-separated):"""
             return []
         
         memories = []
+        seen_uuids = set()  # Deduplicate across expanded queries
         all_groups = self._get_all_group_ids()
+        
+        # Expand the query for better semantic matching
+        expanded_queries = await self.expand_search_query(query)
+        print(f"[Memory] Searching with {len(expanded_queries)} queries: {expanded_queries[:3]}...")
         
         try:
             registry = get_mcp_registry()
             
-            # Search across all memory type groups
-            for group_id in all_groups:
-                # Extract memory type from group_id
-                if "_" in group_id and group_id != self._group_id:
-                    memory_type = group_id.split("_")[-1]
-                else:
-                    memory_type = "general"
-                
-                # Search facts (relationships/edges)
-                try:
-                    facts_result = await registry.call_tool(
-                        f"{self.GRAPHITI_SERVER_NAME}.search_memory_facts",
-                        {"query": query, "group_id": group_id, "limit": limit // 2}
-                    )
+            # Search with each expanded query
+            for search_query in expanded_queries:
+                # Search across all memory type groups
+                for group_id in all_groups:
+                    # Extract memory type from group_id
+                    if "_" in group_id and group_id != self._group_id:
+                        memory_type = group_id.split("_")[-1]
+                    else:
+                        memory_type = "general"
                     
-                    if facts_result.get("success"):
-                        output = facts_result.get("output", {})
-                        if isinstance(output, dict) and "content" in output:
-                            content = output["content"]
-                            if isinstance(content, list) and len(content) > 0:
-                                text = content[0].get("text", "")
-                                try:
-                                    facts = json.loads(text)
-                                    if isinstance(facts, list):
-                                        for fact in facts:
-                                            memories.append({
-                                                "type": "fact",
-                                                "memory_type": memory_type,
-                                                "group_id": group_id,
-                                                "content": fact.get("fact", ""),
-                                                "created_at": fact.get("created_at", ""),
-                                                "valid_at": fact.get("valid_at", ""),
-                                                "uuid": fact.get("uuid", "")
-                                            })
-                                except json.JSONDecodeError:
-                                    pass
-                except Exception as e:
-                    print(f"[Memory] Error searching facts in {group_id}: {e}")
-                
-                # Search nodes (entities)
-                try:
-                    nodes_result = await registry.call_tool(
-                        f"{self.GRAPHITI_SERVER_NAME}.search_nodes",
-                        {"query": query, "group_id": group_id, "limit": limit // 2}
-                    )
+                    # Search facts (relationships/edges)
+                    try:
+                        facts_result = await registry.call_tool(
+                            f"{self.GRAPHITI_SERVER_NAME}.search_memory_facts",
+                            {"query": search_query, "group_id": group_id, "limit": limit // 2}
+                        )
+                        
+                        if facts_result.get("success"):
+                            output = facts_result.get("output", {})
+                            if isinstance(output, dict) and "content" in output:
+                                content = output["content"]
+                                if isinstance(content, list) and len(content) > 0:
+                                    text = content[0].get("text", "")
+                                    try:
+                                        facts = json.loads(text)
+                                        if isinstance(facts, list):
+                                            for fact in facts:
+                                                uuid = fact.get("uuid", "")
+                                                if uuid and uuid not in seen_uuids:
+                                                    seen_uuids.add(uuid)
+                                                    memories.append({
+                                                        "type": "fact",
+                                                        "memory_type": memory_type,
+                                                        "group_id": group_id,
+                                                        "content": fact.get("fact", ""),
+                                                        "created_at": fact.get("created_at", ""),
+                                                        "valid_at": fact.get("valid_at", ""),
+                                                        "uuid": uuid
+                                                    })
+                                    except json.JSONDecodeError:
+                                        pass
+                    except Exception as e:
+                        print(f"[Memory] Error searching facts in {group_id}: {e}")
                     
-                    if nodes_result.get("success"):
-                        output = nodes_result.get("output", {})
-                        if isinstance(output, dict) and "content" in output:
-                            content = output["content"]
-                            if isinstance(content, list) and len(content) > 0:
-                                text = content[0].get("text", "")
-                                try:
-                                    nodes = json.loads(text)
-                                    if isinstance(nodes, list):
-                                        for node in nodes:
-                                            memories.append({
-                                                "type": "node",
-                                                "memory_type": memory_type,
-                                                "group_id": group_id,
-                                                "content": node.get("summary", node.get("name", "")),
-                                                "created_at": node.get("created_at", ""),
-                                                "uuid": node.get("uuid", "")
-                                            })
-                                except json.JSONDecodeError:
-                                    pass
-                except Exception as e:
-                    print(f"[Memory] Error searching nodes in {group_id}: {e}")
+                    # Search nodes (entities)
+                    try:
+                        nodes_result = await registry.call_tool(
+                            f"{self.GRAPHITI_SERVER_NAME}.search_nodes",
+                            {"query": search_query, "group_id": group_id, "limit": limit // 2}
+                        )
+                        
+                        if nodes_result.get("success"):
+                            output = nodes_result.get("output", {})
+                            if isinstance(output, dict) and "content" in output:
+                                content = output["content"]
+                                if isinstance(content, list) and len(content) > 0:
+                                    text = content[0].get("text", "")
+                                    try:
+                                        nodes = json.loads(text)
+                                        if isinstance(nodes, list):
+                                            for node in nodes:
+                                                uuid = node.get("uuid", "")
+                                                if uuid and uuid not in seen_uuids:
+                                                    seen_uuids.add(uuid)
+                                                    memories.append({
+                                                        "type": "node",
+                                                        "memory_type": memory_type,
+                                                        "group_id": group_id,
+                                                        "content": node.get("summary", node.get("name", "")),
+                                                        "created_at": node.get("created_at", ""),
+                                                        "uuid": uuid
+                                                    })
+                                    except json.JSONDecodeError:
+                                        pass
+                    except Exception as e:
+                        print(f"[Memory] Error searching nodes in {group_id}: {e}")
             
             # Log summary by memory type
             type_counts = {}

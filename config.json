@@ -45,7 +45,7 @@
       "api_key": ""
     },
     "formatter": {
-      "id": "nexveridian/granite-4.0-h-tiny",
+      "id": "qwen/qwen3-4b-2507",
       "name": "Final Response Formatter",
       "description": "Formatter model for improving response formatting (empty = use chairman)",
       "ip": "",
@@ -54,7 +54,7 @@
       "api_key": ""
     },
     "tool_calling": {
-      "id": "nexveridian/granite-4.0-h-tiny",
+      "id": "llama-3.2-3b-instruct",
       "name": "Tool Calling Model",
       "description": "Tool-calling model for MCP server interactions",
       "ip": "",
@@ -63,7 +63,7 @@
       "api_key": ""
     },
     "prompt_engineer": {
-      "id": "",
+      "id": "llama-3.2-3b-instruct",
       "name": "Prompt Engineer",
       "description": "Prompt engineering model for dynamic prompt generation (empty = use chairman)",
       "ip": "",
@@ -72,7 +72,7 @@
       "api_key": ""
     },
     "confidence": {
-      "id": "",
+      "id": "llama-3.2-3b-instruct",
       "name": "Memory Confidence Scorer",
       "description": "Model for scoring memory relevance and confidence (empty = use chairman)",
       "ip": "",
@@ -81,7 +81,7 @@
       "api_key": ""
     },
     "categorization": {
-      "id": "",
+      "id": "llama-3.2-3b-instruct",
       "name": "Memory Categorization Model",
       "description": "Model for categorizing memories into types (empty = use chairman)",
       "ip": "",
@@ -98,7 +98,7 @@
     "record_user_messages": true,
     "record_council_responses": true,
     "record_chairman_synthesis": true,
-    "categorization_enabled": false
+    "categorization_enabled": true
   },
   "deliberation": {
     "rounds": 2,

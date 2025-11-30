@@ -1,7 +1,7 @@
 {
   "llm": {
     "provider": "lmstudio",
-    "model": "nexveridian/granite-4.0-h-tiny",
+    "model": "qwen/qwen3-4b-2507",
     "api_key": "lms",
     "base_url": "http://192.168.1.111:11434/v1",
     "temperature": 0.0,
