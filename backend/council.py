@@ -155,8 +155,8 @@ Respond with ONLY a JSON object (no other text):
 
 Classification rules:
 - "factual": Questions with definitive answers (math, dates, definitions, simple facts, how-to with clear answer)
-- "chat": Greetings, acknowledgments, small talk, simple yes/no questions about the AI itself, commands/requests to the AI (like setting a name/nickname), confirmations, thank you messages
-- "deliberation": Opinions, comparisons, feedback requests, creative work, complex analysis, subjective questions, anything requiring multiple perspectives
+- "chat": Greetings, acknowledgments, small talk, simple yes/no questions about the AI itself, questions about the AI's identity/capabilities/nature (like "tell me about yourself", "who are you", "what can you do"), commands/requests to the AI (like setting a name/nickname), confirmations, thank you messages
+- "deliberation": Opinions, comparisons, feedback requests, creative work, complex analysis, subjective questions requiring multiple human perspectives, anything requiring debate between different viewpoints
 
 requires_tools rules:
 - TRUE if query needs: current date/time, current weather, real-time data, web search, IP/location lookup, calculations, external APIs
@@ -170,6 +170,9 @@ Examples:
 - "What's the capital of France?" → factual, requires_tools: false (general knowledge)
 - "Can you help me?" → chat, requires_tools: false
 - "What do you think about AI?" → deliberation, requires_tools: false
+- "Tell me about yourself" → chat, requires_tools: false (AI self-description)
+- "Who are you?" → chat, requires_tools: false (AI identity)
+- "What can you do?" → chat, requires_tools: false (AI capabilities)
 - "What time is it?" → factual, requires_tools: true (current time)
 - "What's the current weather?" → factual, requires_tools: true (real-time data)
 - "Where am I located?" → factual, requires_tools: true (IP/location lookup)
@@ -687,8 +690,36 @@ JSON response:"""
         result = _extract_json_from_response(content)
         
         if result and 'expectations' in result:
-            # Trust the LLM's analysis - no pattern-matching overrides
-            # The LLM prompt is comprehensive enough to handle math, news, etc.
+            # Normalize data types to match DATA_TYPE_TO_TOOL keys
+            data_types = result.get('data_types_needed', [])
+            normalized_types = []
+            for dt in data_types:
+                dt_lower = dt.lower().strip()
+                # Map common variations to canonical names
+                if 'news' in dt_lower or 'headline' in dt_lower or 'event' in dt_lower:
+                    normalized_types.append('news')
+                elif 'weather' in dt_lower or 'temperature' in dt_lower or 'forecast' in dt_lower:
+                    normalized_types.append('weather')
+                elif 'time' in dt_lower or 'date' in dt_lower or 'day' in dt_lower:
+                    normalized_types.append('current_time')
+                elif 'location' in dt_lower or 'address' in dt_lower or 'geo' in dt_lower:
+                    normalized_types.append('location')
+                elif 'calc' in dt_lower or 'math' in dt_lower or 'compute' in dt_lower:
+                    normalized_types.append('calculation')
+                elif 'web' in dt_lower or 'url' in dt_lower or 'page' in dt_lower:
+                    normalized_types.append('web_content')
+                elif dt_lower != 'none':
+                    normalized_types.append(dt_lower)  # Keep as-is if not matched
+            
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_types = []
+            for dt in normalized_types:
+                if dt not in seen:
+                    seen.add(dt)
+                    unique_types.append(dt)
+            
+            result['data_types_needed'] = unique_types if unique_types else ['none']
             print(f"[Expectations] {result.get('expectations', [])}, needs_external: {result.get('needs_external_data')}, data_types: {result.get('data_types_needed', [])}")
             return result
         return None

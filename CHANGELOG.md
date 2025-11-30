@@ -4,6 +4,21 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.36.1
+**Branch:** `v0.36.1`  
+**Completed:** 2025-11-30 14:55 UTC | 2025-11-30 06:55 PST
+
+**Fixes:**
+- **Classification prompt updated**: "Tell me about yourself" and similar AI identity questions now correctly classified as `chat` instead of `deliberation`
+- **Data type normalization**: Tool selection now normalizes LLM-returned data types (e.g., "news headlines" → "news") to match canonical tool mappings
+- Added examples to classification prompt for AI identity questions: "Who are you?", "What can you do?"
+
+**Changes:**
+- `backend/council.py` - Updated classification rules to include AI identity queries as `chat`
+- `backend/council.py` - Added `_analyze_user_expectations()` data type normalization for news, weather, time, location, calculation, web_content
+
+---
+
 ### v0.36.0
 **Branch:** `v0.36.0`  
 **Completed:** 2025-11-30 14:35 UTC | 2025-11-30 06:35 PST
