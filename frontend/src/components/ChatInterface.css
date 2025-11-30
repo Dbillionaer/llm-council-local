@@ -356,6 +356,7 @@
 .input-form.editing {
   background: #fff8e6;
   border-top-color: #f0ad4e;
+  flex-wrap: wrap;
 }
 
 .editing-indicator {
@@ -363,9 +364,16 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  margin-bottom: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f0ad4e;
   font-size: 13px;
   color: #856404;
+}
+
+.input-form.editing .message-input {
+  min-height: 120px;
+  font-size: 14px;
 }
 
 .cancel-edit-btn {

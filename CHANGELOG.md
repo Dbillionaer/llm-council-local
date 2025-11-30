@@ -4,6 +4,21 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.30.6
+**Branch:** `v0.30.6`  
+**Completed:** 2025-11-30 04:20 UTC | 2025-11-29 20:20 PST
+
+**UI Fixes:**
+- **Edit message field too small**: Fixed editing form layout
+  - Added flex-wrap to editing form so indicator spans full width
+  - Increased min-height of textarea when editing (120px)
+  - Added separator line below editing indicator
+
+**Changes:**
+- `frontend/src/components/ChatInterface.css` - Fixed input-form.editing layout
+
+---
+
 ### v0.30.5
 **Branch:** `v0.30.5`  
 **Completed:** 2025-11-30 04:30 UTC | 2025-11-29 20:30 PST
