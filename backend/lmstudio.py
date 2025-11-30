@@ -169,6 +169,18 @@ async def query_model(
     except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException) as e:
         # Re-raise timeout exceptions for retry handling
         raise e
+    except httpx.HTTPStatusError as e:
+        # Log HTTP errors with response body for debugging
+        error_body = ""
+        try:
+            error_body = e.response.text
+        except:
+            pass
+        print(f"HTTP error querying model {model} at {api_endpoint}: {e}")
+        print(f"Response body: {error_body}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return None
     except Exception as e:
         print(f"Error querying model {model} at {api_endpoint}: {e}")
         # Print more detailed error info for debugging

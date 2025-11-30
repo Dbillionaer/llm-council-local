@@ -4,6 +4,20 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.30.10
+**Branch:** `v0.30.10`  
+**Completed:** 2025-11-30 05:32 UTC | 2025-11-29 21:32 PST
+
+**Bug Fixes:**
+- **Improved HTTP error logging**: Added specific handling for HTTPStatusError to capture response body
+  - 400 Bad Request errors now log the API response body for debugging
+  - Helps diagnose model compatibility issues with LM Studio
+
+**Changes:**
+- `backend/lmstudio.py` - Added httpx.HTTPStatusError exception handler with response body logging
+
+---
+
 ### v0.30.9
 **Branch:** `v0.30.9`  
 **Completed:** 2025-11-30 05:15 UTC | 2025-11-29 21:15 PST
