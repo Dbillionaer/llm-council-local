@@ -4,6 +4,31 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.30.5
+**Branch:** `v0.30.5`  
+**Completed:** 2025-11-30 04:30 UTC | 2025-11-29 20:30 PST
+
+**UI/UX Fixes:**
+- **Message IDs moved inside frame**: IDs now appear at top-left inside message content area
+- **Classification reasoning shown**: Shows reasoning text when classification completes
+- **Completion message added**: Blue completion indicator at end of deliberation/direct response
+- **Tool steps overlay fixed**: Removed overflow:hidden so hover overlay displays fully
+- **Smart auto-scroll**: Page only auto-scrolls to bottom if user hasn't scrolled up; resets on new message
+
+**Changes:**
+- `frontend/src/components/ChatInterface.jsx`:
+  - Moved message-ids inside message-content
+  - Added classification-detail section with reasoning
+  - Added completion-message at end of responses
+  - Added userScrolledUp state for smart scroll behavior
+- `frontend/src/components/ChatInterface.css`:
+  - Added styles for classification-detail, completion-message
+  - Adjusted message-ids positioning for inside-frame display
+- `frontend/src/components/ToolSteps.css`:
+  - Changed overflow:hidden to overflow:visible for proper hover overlay
+
+---
+
 ### v0.30.4
 **Branch:** `v0.30.4`  
 **Completed:** 2025-11-30 04:05 UTC | 2025-11-29 20:05 PST

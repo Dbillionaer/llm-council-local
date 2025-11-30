@@ -17,6 +17,7 @@ export default function ChatInterface({
   const [input, setInput] = useState('');
   const [editingIndex, setEditingIndex] = useState(null);
   const [showPinnedHeader, setShowPinnedHeader] = useState(false);
+  const [userScrolledUp, setUserScrolledUp] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const firstUserMessageRef = useRef(null);
@@ -49,16 +50,32 @@ export default function ChatInterface({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Auto-scroll to bottom only if user hasn't scrolled up
   useEffect(() => {
-    scrollToBottom();
-  }, [conversation]);
+    if (!userScrolledUp) {
+      scrollToBottom();
+    }
+  }, [conversation, userScrolledUp]);
 
-  // Handle scroll to show/hide pinned header
+  // Reset userScrolledUp when a new message is sent (conversation length increases)
+  useEffect(() => {
+    setUserScrolledUp(false);
+  }, [conversation?.messages?.length]);
+
+  // Handle scroll to show/hide pinned header and detect user scroll
   useEffect(() => {
     const container = messagesContainerRef.current;
     if (!container) return;
 
     const handleScroll = () => {
+      // Check if user scrolled up from bottom
+      const isAtBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 100;
+      if (!isAtBottom && !userScrolledUp) {
+        setUserScrolledUp(true);
+      } else if (isAtBottom && userScrolledUp) {
+        setUserScrolledUp(false);
+      }
+      
       if (!firstUserMessageRef.current) {
         setShowPinnedHeader(false);
         return;
@@ -73,7 +90,7 @@ export default function ChatInterface({
 
     container.addEventListener('scroll', handleScroll);
     return () => container.removeEventListener('scroll', handleScroll);
-  }, [firstUserMessage]);
+  }, [firstUserMessage, userScrolledUp]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -197,12 +214,12 @@ export default function ChatInterface({
             >
               {msg.role === 'user' ? (
                 <div className="user-message">
-                  <div className="message-ids">
-                    <span className="id-badge conversation-id" title="Conversation ID">{conversation.id?.slice(0, 8)}</span>
-                    <span className="id-separator">|</span>
-                    <span className="id-badge message-id" title="Message ID">{index}</span>
-                  </div>
                   <div className="message-content">
+                    <div className="message-ids">
+                      <span className="id-badge conversation-id" title="Conversation ID">{conversation.id?.slice(0, 8)}</span>
+                      <span className="id-separator">|</span>
+                      <span className="id-badge message-id" title="Message ID">{index}</span>
+                    </div>
                     <div className="markdown-content">
                       <MarkdownRenderer>{msg.content}</MarkdownRenderer>
                     </div>
@@ -247,11 +264,20 @@ export default function ChatInterface({
                     )}
                   </div>
 
-                  {/* Classification indicator while classifying */}
+                  {/* Classification indicator - show details when complete */}
                   {msg.classification?.status === 'classifying' && (
                     <div className="stage-loading">
                       <div className="spinner"></div>
                       <span>Analyzing message type...</span>
+                    </div>
+                  )}
+                  
+                  {/* Show classification reasoning when complete */}
+                  {msg.classification?.status === 'complete' && msg.classification?.reasoning && (
+                    <div className="classification-detail">
+                      <span className="classification-reasoning">
+                        {msg.classification.reasoning}
+                      </span>
                     </div>
                   )}
 
@@ -385,6 +411,16 @@ export default function ChatInterface({
                       streaming={msg.streaming?.stage3}
                       isDirect={msg.responseType === 'direct'}
                     />
+                  )}
+                  
+                  {/* Completion indicator */}
+                  {msg.stage3 && !msg.streaming?.stage3?.isStreaming && (
+                    <div className="completion-message">
+                      <span className="completion-icon">✓</span>
+                      <span className="completion-text">
+                        {msg.responseType === 'direct' ? 'Direct response complete' : 'Council deliberation complete'}
+                      </span>
+                    </div>
                   )}
                 </div>
               )}
