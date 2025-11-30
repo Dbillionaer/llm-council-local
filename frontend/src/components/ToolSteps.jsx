@@ -69,6 +69,22 @@ export default function ToolSteps({ toolSteps = [], currentStep = null }) {
     return jsonStr.length > 500 ? jsonStr.substring(0, 500) + '...' : jsonStr;
   };
 
+  // Format timestamp for display
+  const formatTimestamp = (timestamp) => {
+    if (!timestamp) return null;
+    const date = new Date(timestamp);
+    const localTime = date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+    const utcTime = date.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+    return { local: localTime, utc: utcTime };
+  };
+
   return (
     <div className={`tool-steps ${isExpanded ? 'expanded' : 'collapsed'}`}>
       {/* Header - always visible */}
@@ -171,9 +187,18 @@ export default function ToolSteps({ toolSteps = [], currentStep = null }) {
                     <span className="step-stats-value">{step.tool.split('.').slice(1).join('.') || step.tool}</span>
                   </div>
                   <div className="step-stats-row">
-                    <span className="step-stats-label">Execution Time</span>
+                    <span className="step-stats-label">Duration</span>
                     <span className="step-stats-value">{step.executionTime !== undefined ? `${step.executionTime.toFixed(2)}s` : 'N/A'}</span>
                   </div>
+                  {step.startTime && (
+                    <div className="step-stats-row step-stats-timestamp">
+                      <span className="step-stats-label">Executed At</span>
+                      <span className="step-stats-value">
+                        {formatTimestamp(step.startTime)?.local}<br/>
+                        <span className="utc-time">{formatTimestamp(step.startTime)?.utc}</span>
+                      </span>
+                    </div>
+                  )}
                   <div className="step-stats-row">
                     <span className="step-stats-label">Status</span>
                     <span className={`step-stats-value ${step.status === 'error' ? 'error' : 'success'}`}>

@@ -298,6 +298,15 @@
   color: #f44336;
 }
 
+.step-stats-timestamp .step-stats-value {
+  line-height: 1.4;
+}
+
+.step-stats-value .utc-time {
+  color: #aaa;
+  font-size: 11px;
+}
+
 .step-stats-output {
   margin-top: 10px;
   padding-top: 10px;

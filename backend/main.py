@@ -156,6 +156,7 @@ class ConversationMetadata(BaseModel):
     created_at: str
     title: str
     message_count: int
+    tags: List[str] = []
 
 
 class Conversation(BaseModel):

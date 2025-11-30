@@ -4,6 +4,26 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.32.5
+**Branch:** `v0.32.5`  
+**Completed:** 2025-11-30 08:35 UTC | 2025-11-30 00:35 PST
+
+**Bug Fixes:**
+- **Tool call timestamp display**: Changed "Execution Time" to show actual execution timestamp
+  - Shows local timezone time and UTC time on separate lines
+  - Renamed label from "Execution Time" to "Duration" for the execution duration
+  - Added "Executed At" field with timestamp
+- **CFS test filter API response**: Added `tags` field to `ConversationMetadata` Pydantic model
+  - Tags were being extracted but Pydantic was stripping them from API response
+  - Test conversations now correctly appear in Test filter
+
+**Changes:**
+- `frontend/src/components/ToolSteps.jsx` - Added timestamp formatting and display
+- `frontend/src/components/ToolSteps.css` - Added UTC time styling
+- `backend/main.py` - Added `tags: List[str] = []` to ConversationMetadata model
+
+---
+
 ### v0.32.4
 **Branch:** `v0.32.4`  
 **Completed:** 2025-11-30 08:10 UTC | 2025-11-30 00:10 PST
