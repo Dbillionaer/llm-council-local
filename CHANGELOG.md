@@ -4,6 +4,19 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.42.5
+**Branch:** `v0.42.5`  
+**Completed:** 2025-12-01 10:00 UTC | 2025-12-01 02:00 PST
+
+**Fixes:**
+- **Repeated Greeting Prevention**: Fixed AI greeting user again within same conversation
+  - Modified `get_time_context_string()` to accept `is_first_message` parameter
+  - Only includes greeting guidance (e.g., "Good morning") on first message
+  - Strengthened continuity guidance to explicitly prevent "Hello!", "Hi!", "It's great to hear from you again!" etc.
+  - AI now continues conversation naturally without resetting pleasantries
+
+---
+
 ### v0.42.4
 **Branch:** `v0.42.4`  
 **Completed:** 2025-12-01 09:35 UTC | 2025-12-01 01:35 PST

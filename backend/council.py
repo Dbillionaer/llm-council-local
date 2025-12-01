@@ -71,18 +71,26 @@ def get_time_of_day_greeting() -> str:
         return "Hello"  # Late night/early morning
 
 
-def get_time_context_string() -> str:
+def get_time_context_string(is_first_message: bool = True) -> str:
     """
     Build a rich time context string including time-of-day greeting guidance.
+    
+    Args:
+        is_first_message: If True, includes greeting guidance. If False, omits it.
     """
     current_time = datetime.now()
     greeting = get_time_of_day_greeting()
     
-    return f"""Current date: {current_time.strftime('%B %d, %Y')} ({current_time.strftime('%A')})
-Current time: {current_time.strftime('%H:%M')} (local time)
+    context = f"""Current date: {current_time.strftime('%B %d, %Y')} ({current_time.strftime('%A')})
+Current time: {current_time.strftime('%H:%M')} (local time)"""
+    
+    if is_first_message:
+        context += f"""
 Appropriate greeting: {greeting}
 
 When greeting the user, use time-appropriate greetings (e.g., "{greeting}" instead of just "Hello")."""
+    
+    return context
 
 
 # ============== Response Post-Processing ==============
@@ -402,7 +410,9 @@ The tool failed to retrieve the requested information. Be honest about this fail
 Do NOT fabricate or make up data. Explain what went wrong and suggest the user try again later."""
     else:
         # No tool data - include rich time context for greetings/chat
-        rich_time_context = get_time_context_string()
+        # Only include greeting guidance if this is the first message in the conversation
+        is_first_message = not conversation_history or len(conversation_history) == 0
+        rich_time_context = get_time_context_string(is_first_message=is_first_message)
         prompt = f"""Answer this question directly and concisely.
 
 Question: {user_query}
@@ -419,11 +429,12 @@ Provide a helpful, accurate answer. Be conversational and concise."""
     continuity_guidance = ""
     if conversation_history and len(conversation_history) > 0:
         continuity_guidance = """
-CONVERSATION CONTINUITY:
-- This is an ongoing conversation. DO NOT repeat greetings you've already made.
-- DO NOT re-introduce yourself if you've already done so in this conversation.
-- Use natural conversational flow - acknowledge what the user said and respond appropriately.
-- If user mentions your name, don't re-state it back unless necessary.
+CRITICAL - CONVERSATION CONTINUITY:
+- This is an ONGOING conversation - you have already interacted with this user.
+- DO NOT greet again with "Hello!", "Hi!", "Good morning!" etc. - you already did that.
+- DO NOT say things like "It's great to hear from you again!" or similar reset phrases.
+- Continue the conversation naturally as if mid-discussion.
+- If user asks a follow-up question, just answer it directly without pleasantries.
 """
     
     if system_message:
