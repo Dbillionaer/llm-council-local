@@ -4,6 +4,18 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.42.1
+**Branch:** `v0.42.1`  
+**Completed:** 2025-12-01 05:55 UTC | 2025-11-30 21:55 PST
+
+**Fixes:**
+- **Standard Conversation Title Update**: Fixed title not updating in sidebar without page refresh
+  - Issue: `loadConversations()` called on `complete` event overwrote title set by `title_complete`
+  - Fix: Replace full reload with local state update (increment message_count by 2)
+  - Title now immediately reflects in sidebar when generated during standard responses
+
+---
+
 ### v0.42.0
 **Branch:** `v0.42.0`  
 **Completed:** 2025-12-01 05:25 UTC | 2025-11-30 21:25 PST

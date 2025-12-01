@@ -809,8 +809,13 @@ function App() {
             break;
 
           case 'complete':
-            // Stream complete, reload conversations list
-            loadConversations();
+            // Stream complete - update message count locally instead of reloading
+            // This preserves the title_complete update that already happened
+            setConversations(prev => prev.map(conv => 
+              conv.id === currentConversationId 
+                ? { ...conv, message_count: (conv.message_count || 0) + 2 } // +2 for user + assistant
+                : conv
+            ));
             setIsLoading(false);
             break;
 
