@@ -335,6 +335,7 @@ export default function ChatInterface({
                   {(msg.toolSteps && msg.toolSteps.length > 0) && (
                     <ToolSteps 
                       toolSteps={msg.toolSteps}
+                      isComplete={!!(msg.stage3 && !msg.streaming?.stage3?.isStreaming)}
                     />
                   )}
 
@@ -472,10 +473,10 @@ export default function ChatInterface({
                           </>
                         );
 
-                        // When deliberation is complete, wrap everything in collapsible
+                        // When deliberation is complete, wrap everything in collapsible (closed by default)
                         if (isDeliberationComplete) {
                           return (
-                            <details className="deliberation-collapsible">
+                            <details className="deliberation-collapsible" open={false}>
                               <summary className="deliberation-summary">
                                 <span className="deliberation-icon">🤔</span>
                                 <span className="deliberation-text">Council Deliberation Process</span>

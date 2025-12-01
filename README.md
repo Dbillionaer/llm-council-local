@@ -17,7 +17,15 @@ In a bit more detail, here is what happens when you submit a query:
 
 ## Key Features
 
-### Current Release (v0.41.3)
+### Current Release (v0.42.0)
+- **Auto-Collapse Frames on Completion**: Tool steps and deliberation frames now auto-collapse
+  - Tool steps collapse when response completes (streaming → complete transition)
+  - Deliberation sections start closed (`open={false}`) for completed conversations
+  - Saved conversations load with frames collapsed by default
+  - Click to expand and view details as needed
+  - Cleaner UI focused on final answers
+
+### Previous Release (v0.41.3)
 - **Saved Conversation Display Fix**: Proper display when loading saved conversations
   - Direct responses correctly show "⚡ Direct" badge and skip deliberation UI
   - Classification badge correctly infers type from stored data

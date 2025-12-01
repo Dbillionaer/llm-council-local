@@ -4,6 +4,20 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.42.0
+**Branch:** `v0.42.0`  
+**Completed:** 2025-12-01 05:25 UTC | 2025-11-30 21:25 PST
+
+**Features:**
+- **Auto-Collapse Frames on Completion**: Tool steps and deliberation frames now auto-collapse
+  - ToolSteps component accepts `isComplete` prop to control default state
+  - useEffect triggers collapse when `isComplete` transitions to true
+  - Deliberation `<details>` element explicitly uses `open={false}` for completed conversations
+  - Saved conversations load with frames collapsed by default
+  - User can still click to expand and view details
+
+---
+
 ### v0.41.3
 **Branch:** `v0.41.3`  
 **Completed:** 2025-12-01 05:10 UTC | 2025-11-30 21:10 PST

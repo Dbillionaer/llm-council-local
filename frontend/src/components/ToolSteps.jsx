@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './ToolSteps.css';
 
 /**
@@ -13,11 +13,20 @@ import './ToolSteps.css';
  * Props:
  * - toolSteps: Array of tool step objects with: tool, input, output, executionTime, status, startTime
  * - currentStep: Currently executing step (optional, for live updates)
+ * - isComplete: Whether the overall response is complete (collapses by default when true)
  */
-export default function ToolSteps({ toolSteps = [], currentStep = null }) {
-  const [isExpanded, setIsExpanded] = useState(false);
+export default function ToolSteps({ toolSteps = [], currentStep = null, isComplete = false }) {
+  // Start collapsed if response is complete (for saved conversations), expanded during streaming
+  const [isExpanded, setIsExpanded] = useState(!isComplete);
   const [expandedSteps, setExpandedSteps] = useState({});
   const [hoveredStep, setHoveredStep] = useState(null);
+
+  // Auto-collapse when response completes (streaming -> complete transition)
+  useEffect(() => {
+    if (isComplete) {
+      setIsExpanded(false);
+    }
+  }, [isComplete]);
 
   // Combine completed steps with current step (use call_id to avoid duplicates)
   const allSteps = currentStep 
