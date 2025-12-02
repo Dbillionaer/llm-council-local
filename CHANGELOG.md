@@ -4,6 +4,17 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.42.10
+**Branch:** `v0.42.10`  
+**Completed:** 2025-12-02 05:10 UTC | 2025-12-01 21:10 PST
+
+**Fixes:**
+- **Memory Count Includes Cached Names**: Fixed UI showing "0 memories found" when cached AI/user names were used
+  - When query is about AI name (e.g., "what's your name?"), cached `_ai_name` is added as synthetic memory
+  - When query is about user name (e.g., "what's my name?"), cached `_user_name` is added as synthetic memory
+  - Synthetic memories are inserted at the beginning of search results
+  - Prevents confusion where UI showed "0 memories" but response correctly used the name
+
 ### v0.42.9
 **Branch:** `v0.42.9`  
 **Completed:** 2025-12-02 04:25 UTC | 2025-12-01 20:25 PST

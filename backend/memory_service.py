@@ -674,6 +674,44 @@ Types (comma-separated):"""
                     except Exception as e:
                         print(f"[Memory] Error searching nodes in {group_id}: {e}")
             
+            # Add cached names as synthetic memories when relevant to query
+            query_lower = query.lower()
+            is_ai_name_query = any(phrase in query_lower for phrase in [
+                "your name", "what's your name", "who are you", "what are you called",
+                "name again", "remind me your name"
+            ])
+            is_user_name_query = any(phrase in query_lower for phrase in [
+                "my name", "what's my name", "who am i", "remember my name"
+            ])
+            
+            # Include cached AI name if relevant and not already in results
+            if is_ai_name_query and self._ai_name:
+                ai_name_content = f"The AI assistant's name is {self._ai_name}"
+                if not any(self._ai_name.lower() in m.get("content", "").lower() for m in memories):
+                    memories.insert(0, {
+                        "type": "cached",
+                        "memory_type": "autobiographical",
+                        "group_id": f"{MEMORY_GROUP_PREFIX}_autobiographical",
+                        "content": ai_name_content,
+                        "created_at": "",
+                        "uuid": "cached_ai_name"
+                    })
+                    print(f"[Memory] Added cached AI name: {self._ai_name}")
+            
+            # Include cached user name if relevant and not already in results
+            if is_user_name_query and self._user_name:
+                user_name_content = f"The user's name is {self._user_name}"
+                if not any(self._user_name.lower() in m.get("content", "").lower() for m in memories):
+                    memories.insert(0, {
+                        "type": "cached",
+                        "memory_type": "autobiographical",
+                        "group_id": f"{MEMORY_GROUP_PREFIX}_autobiographical",
+                        "content": user_name_content,
+                        "created_at": "",
+                        "uuid": "cached_user_name"
+                    })
+                    print(f"[Memory] Added cached user name: {self._user_name}")
+            
             # Log summary by memory type
             type_counts = {}
             for m in memories:
