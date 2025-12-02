@@ -4,6 +4,28 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.42.7
+**Branch:** `v0.42.7`  
+**Completed:** 2025-12-02 03:40 UTC | 2025-12-01 19:40 PST
+
+**Fixes:**
+- **Memory Data Labeling System**: Implemented data classification for memory commits
+  - Added `DATA_LABELS` constants: `tool_data`, `intelligence`, `llm_data`
+  - `tool_data`: Data from external tools (MCP servers) - always committed
+  - `intelligence`: LLM-generated insights, preferences, suggestions - committed
+  - `llm_data`: Generic LLM output (conversational responses) - NOT committed
+  - Added `classify_data_label()` method for automatic label detection
+  - Added `should_commit_memory()` method to filter what gets stored
+  - Updated `record_episode()` to accept and check data labels
+  - Added `record_tool_data()` and `record_intelligence()` helper methods
+  - Council and chairman responses now labeled as `llm_data` (not stored)
+  - User messages labeled as `intelligence` (stored for preferences/identity)
+- **Hermes Node Cleanup**: Created `scripts/remove_hermes_nodes.py` script
+  - Searches for and removes all Hermes-related nodes and edges from graph
+  - Prevents incorrect AI name associations in memory
+
+---
+
 ### v0.42.6
 **Branch:** `v0.42.6`  
 **Completed:** 2025-12-01 11:30 UTC | 2025-12-01 03:30 PST

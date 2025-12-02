@@ -10,6 +10,26 @@ from .config_loader import load_config
 from .lmstudio import query_model_with_retry
 
 
+# Data source labels for memory filtering
+DATA_LABELS = {
+    "tool_data": {
+        "description": "Data returned from external tools (MCP servers)",
+        "commit_to_memory": True,
+        "examples": ["web search results", "weather data", "calculator output", "scraped content"]
+    },
+    "intelligence": {
+        "description": "LLM-generated insights, suggestions, ideas, preferences worth remembering",
+        "commit_to_memory": True,
+        "examples": ["user preference identified", "insight about topic", "suggested approach", "personality trait"]
+    },
+    "llm_data": {
+        "description": "Generic LLM-generated content not classified as intelligence",
+        "commit_to_memory": False,  # IGNORED when committing memory
+        "examples": ["conversational responses", "explanations", "raw model output"]
+    }
+}
+
+
 # Human memory type definitions for categorization
 MEMORY_TYPES = {
     "episodic": {
@@ -316,6 +336,72 @@ Types (comma-separated):"""
         # Fallback to general
         return {"general"}
     
+    def classify_data_label(self, content: str, source_description: str) -> str:
+        """
+        Classify content into a data label for memory filtering.
+        
+        Data Labels:
+        - "tool_data": Data returned from tools (MCP servers) - always commit
+        - "intelligence": LLM insights/suggestions worth remembering - commit
+        - "llm_data": Generic LLM output - DO NOT commit to memory
+        
+        Args:
+            content: The content to classify
+            source_description: Source of the data (e.g., "tool:websearch", "council:model", "user")
+            
+        Returns:
+            Data label string ("tool_data", "intelligence", or "llm_data")
+        """
+        source_lower = source_description.lower()
+        
+        # Tool data - from MCP servers/tools
+        if source_lower.startswith("tool:") or "mcp" in source_lower:
+            print(f"[Memory] Labeled as tool_data: {source_description}")
+            return "tool_data"
+        
+        # User messages are always intelligence (user preferences, identity, etc.)
+        if source_lower == "user":
+            print(f"[Memory] Labeled as intelligence: user message")
+            return "intelligence"
+        
+        # For LLM-generated content, check if it contains intelligence markers
+        content_lower = content.lower()
+        intelligence_markers = [
+            # User-related intelligence
+            "user prefers", "user wants", "user likes", "user's name",
+            "remember that", "important to note", "preference",
+            # AI identity intelligence
+            "my name is", "i am called", "known as", "aether",
+            # Insights and suggestions
+            "insight:", "suggestion:", "recommendation:",
+            "i learned", "i noticed", "pattern identified",
+            # Personality/preference development
+            "i prefer", "i like", "my favorite", "i enjoy",
+            "my personality", "my trait", "my characteristic"
+        ]
+        
+        for marker in intelligence_markers:
+            if marker in content_lower:
+                print(f"[Memory] Labeled as intelligence: contains '{marker}'")
+                return "intelligence"
+        
+        # Default: LLM data (not committed to memory)
+        print(f"[Memory] Labeled as llm_data: {source_description}")
+        return "llm_data"
+    
+    def should_commit_memory(self, data_label: str) -> bool:
+        """
+        Check if data with the given label should be committed to memory.
+        
+        Args:
+            data_label: The data label ("tool_data", "intelligence", or "llm_data")
+            
+        Returns:
+            True if should commit, False if should ignore
+        """
+        label_config = DATA_LABELS.get(data_label, {})
+        return label_config.get("commit_to_memory", False)
+    
     def _get_group_id_for_type(self, memory_type: str) -> str:
         """Get the group ID for a specific memory type."""
         if memory_type == "general":
@@ -389,23 +475,39 @@ Types (comma-separated):"""
         source_description: str,
         episode_type: str = "message",
         reference_time: Optional[datetime] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        data_label: Optional[str] = None
     ) -> bool:
         """
         Record an episode (message) to the Graphiti knowledge graph.
         Automatically classifies into memory types and stores in appropriate groups.
         
+        Data labeling:
+        - "tool_data": Data from tools (always commit)
+        - "intelligence": LLM insights worth remembering (commit)
+        - "llm_data": Generic LLM output (ignored - NOT committed)
+        
         Args:
             content: The message content
-            source_description: Description of source (e.g., "user", "council:model_name", "chairman:model_name")
+            source_description: Description of source (e.g., "user", "tool:websearch", "council:model_name")
             episode_type: Type of episode (message, response, synthesis)
             reference_time: Timestamp for the episode (defaults to now)
             metadata: Additional metadata to include
+            data_label: Override data label ("tool_data", "intelligence", "llm_data")
             
         Returns:
             True if recording succeeded, False otherwise
         """
         if not self._available:
+            return False
+        
+        # Classify data label if not provided
+        if data_label is None:
+            data_label = self.classify_data_label(content, source_description)
+        
+        # Check if this data should be committed to memory
+        if not self.should_commit_memory(data_label):
+            print(f"[Memory] Skipping {data_label} - not committed to memory")
             return False
         
         if reference_time is None:
@@ -429,9 +531,10 @@ Types (comma-separated):"""
                 "group_id": group_id
             }
             
-            # Add memory type to metadata
+            # Add memory type and data label to metadata
             episode_metadata = metadata.copy() if metadata else {}
             episode_metadata["memory_type"] = memory_type
+            episode_metadata["data_label"] = data_label
             episode_metadata["all_types"] = list(memory_types)
             episode_data["metadata"] = json.dumps(episode_metadata)
             
@@ -786,12 +889,13 @@ If confidence is below 0.7, set recommended_answer to null."""
         return None
     
     async def record_user_message(self, content: str, conversation_id: str):
-        """Record a user message asynchronously."""
+        """Record a user message asynchronously. User messages are always 'intelligence'."""
         await self.record_episode(
             content=content,
             source_description="user",
             episode_type="user_message",
-            metadata={"conversation_id": conversation_id}
+            metadata={"conversation_id": conversation_id},
+            data_label="intelligence"  # User messages are always worth remembering
         )
     
     async def record_council_response(
@@ -801,12 +905,13 @@ If confidence is below 0.7, set recommended_answer to null."""
         stage: int,
         conversation_id: str
     ):
-        """Record a council member's response asynchronously."""
+        """Record a council member's response asynchronously. Labeled as llm_data (not committed)."""
         await self.record_episode(
             content=content,
             source_description=f"council:{model}",
             episode_type=f"stage{stage}_response",
-            metadata={"conversation_id": conversation_id, "model": model, "stage": stage}
+            metadata={"conversation_id": conversation_id, "model": model, "stage": stage},
+            data_label="llm_data"  # Council responses are generic LLM output
         )
     
     async def record_chairman_synthesis(
@@ -815,12 +920,13 @@ If confidence is below 0.7, set recommended_answer to null."""
         model: str,
         conversation_id: str
     ):
-        """Record the chairman's final synthesis asynchronously."""
+        """Record the chairman's final synthesis asynchronously. Labeled as llm_data (not committed)."""
         await self.record_episode(
             content=content,
             source_description=f"chairman:{model}",
             episode_type="chairman_synthesis",
-            metadata={"conversation_id": conversation_id, "model": model}
+            metadata={"conversation_id": conversation_id, "model": model},
+            data_label="llm_data"  # Chairman synthesis is generic LLM output
         )
     
     async def record_direct_response(
@@ -830,14 +936,61 @@ If confidence is below 0.7, set recommended_answer to null."""
         model: str,
         conversation_id: str
     ):
-        """Record a direct response (non-deliberation path) asynchronously."""
+        """Record a direct response (non-deliberation path) asynchronously. Labeled as llm_data."""
         # Record both query and response as a single episode
         combined = f"Q: {query}\n\nA: {response}"
         await self.record_episode(
             content=combined,
             source_description=f"direct:{model}",
             episode_type="direct_response",
-            metadata={"conversation_id": conversation_id, "model": model}
+            metadata={"conversation_id": conversation_id, "model": model},
+            data_label="llm_data"  # Direct responses are generic LLM output
+        )
+    
+    async def record_tool_data(
+        self,
+        tool_name: str,
+        tool_output: str,
+        conversation_id: str
+    ):
+        """
+        Record tool output data. Tool data is always committed to memory.
+        
+        Args:
+            tool_name: Name of the tool (e.g., "websearch", "calculator")
+            tool_output: The data returned by the tool
+            conversation_id: ID of the conversation
+        """
+        await self.record_episode(
+            content=tool_output,
+            source_description=f"tool:{tool_name}",
+            episode_type="tool_output",
+            metadata={"conversation_id": conversation_id, "tool": tool_name},
+            data_label="tool_data"  # Tool data is always committed
+        )
+    
+    async def record_intelligence(
+        self,
+        content: str,
+        source: str,
+        conversation_id: str,
+        intelligence_type: str = "insight"
+    ):
+        """
+        Record intelligence (insights, preferences, suggestions worth remembering).
+        
+        Args:
+            content: The intelligence content
+            source: Source of the intelligence (e.g., "user_preference", "ai_personality")
+            conversation_id: ID of the conversation
+            intelligence_type: Type of intelligence (insight, preference, suggestion)
+        """
+        await self.record_episode(
+            content=content,
+            source_description=f"intelligence:{source}",
+            episode_type=intelligence_type,
+            metadata={"conversation_id": conversation_id, "intelligence_type": intelligence_type},
+            data_label="intelligence"  # Intelligence is always committed
         )
     
     def is_personal_question(self, query: str) -> Dict[str, Any]:
