@@ -432,6 +432,9 @@ export default function ChatInterface({
                       {/* Deliberation stages - collapsible when complete */}
                       {(() => {
                         const isDeliberationComplete = msg.stage3 && !msg.streaming?.stage3?.isStreaming;
+                        
+                        // Deliberation content: Stage1, Stage2, and Stage3 loading/streaming
+                        // Stage3 final content is shown OUTSIDE the collapsible to avoid duplication
                         const deliberationContent = (
                           <>
                             {/* Stage 1 */}
@@ -465,7 +468,7 @@ export default function ChatInterface({
                               />
                             )}
 
-                            {/* Stage 3 loading */}
+                            {/* Stage 3 loading indicator */}
                             {msg.loading?.stage3 && !msg.stage3 && !msg.streaming?.stage3?.content && (
                               <div className="stage-loading">
                                 <div className="spinner"></div>
@@ -473,10 +476,11 @@ export default function ChatInterface({
                               </div>
                             )}
                             
-                            {/* Stage 3 Final Answer - inside deliberation section */}
-                            {(msg.stage3 || msg.streaming?.stage3?.content) && (
+                            {/* Stage 3 streaming - only show while actively streaming, not when complete */}
+                            {/* Once complete, Stage3 is shown in final-answer-section instead */}
+                            {!isDeliberationComplete && (msg.streaming?.stage3?.content) && (
                               <Stage3 
-                                finalResponse={msg.stage3} 
+                                finalResponse={null} 
                                 streaming={msg.streaming?.stage3}
                                 isDirect={false}
                               />
@@ -487,16 +491,22 @@ export default function ChatInterface({
                         // When deliberation is complete, wrap everything in collapsible (closed by default)
                         if (isDeliberationComplete) {
                           return (
-                            <details className="deliberation-collapsible" open={false}>
-                              <summary className="deliberation-summary">
-                                <span className="deliberation-icon">🤔</span>
-                                <span className="deliberation-text">Council Deliberation Process</span>
-                                <span className="deliberation-hint">(click to expand)</span>
-                              </summary>
-                              <div className="deliberation-content">
-                                {deliberationContent}
+                            <div className="deliberation-wrapper">
+                              {/* Name overlay for deliberation process */}
+                              <div className="message-name-overlay deliberation-name">
+                                LLM Council
                               </div>
-                            </details>
+                              <details className="deliberation-collapsible" open={false}>
+                                <summary className="deliberation-summary">
+                                  <span className="deliberation-icon">🤔</span>
+                                  <span className="deliberation-text">Deliberation Process</span>
+                                  <span className="deliberation-hint">(click to expand)</span>
+                                </summary>
+                                <div className="deliberation-content">
+                                  {deliberationContent}
+                                </div>
+                              </details>
+                            </div>
                           );
                         }
                         // While deliberating, show all content expanded
@@ -529,9 +539,18 @@ export default function ChatInterface({
                   {/* Check both msg.responseType (streaming) and msg.stage3?.type (saved) */}
                   {msg.responseType !== 'direct' && msg.stage3?.type !== 'direct' && msg.stage3?.type !== 'memory' && msg.stage3 && !msg.streaming?.stage3?.isStreaming && (
                     <div className="final-answer-section">
+                      {/* Name overlay for final answer - uses AI name or defaults */}
+                      <div className="message-name-overlay ai-name">
+                        {memoryNames.ai_name || 'Assistant'}
+                      </div>
                       <div className="final-answer-header">
                         <span className="final-answer-icon">✨</span>
-                        <span className="final-answer-title">Final Council Answer</span>
+                        <span className="final-answer-title">
+                          {/* Use conversation title if available, otherwise generic */}
+                          {conversation?.title && !conversation.title.startsWith('Conversation ') 
+                            ? conversation.title 
+                            : 'Final Council Answer'}
+                        </span>
                       </div>
                       <div className="final-answer-content markdown-content">
                         <Stage3 

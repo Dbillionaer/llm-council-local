@@ -548,10 +548,23 @@
   padding-top: 32px;
 }
 
+/* Deliberation wrapper with name overlay */
+.deliberation-wrapper {
+  position: relative;
+  margin: 16px 0;
+  margin-top: 24px;  /* Extra space for name overlay */
+}
+
+/* Name overlay for deliberation - grey theme */
+.message-name-overlay.deliberation-name {
+  background: #757575;
+  color: #ffffff;
+  border: none;
+}
+
 /* Collapsible deliberation section */
 .deliberation-collapsible {
-  margin: 16px 0;
-  border: 1px solid #e0e0e0;
+  border: 1px solid #bdbdbd;
   border-radius: 8px;
   background: #fafafa;
 }
@@ -592,8 +605,11 @@
 
 /* Final answer section - prominent display outside collapsible */
 .final-answer-section {
+  position: relative;  /* For name overlay positioning */
   margin: 16px 0;
+  margin-top: 24px;  /* Extra space for name overlay */
   padding: 16px;
+  padding-top: 20px;  /* Extra padding for name overlay */
   background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
   border: 2px solid #81c784;
   border-radius: 12px;

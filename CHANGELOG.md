@@ -4,6 +4,26 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.46.0
+**Branch:** `v0.46.0`  
+**Completed:** 2025-12-13 02:15 UTC | 2025-12-12 18:15 PST
+
+**Features:**
+- **Deliberation UI Restructure**: Improved visual separation between deliberation process and final answer
+  - Fixed duplicate Stage3 display issue - Stage3 now only shown once (in final answer section)
+  - Added nametag overlay "LLM Council" on deliberation collapsible frame
+  - Added nametag overlay with AI name on final answer frame
+  - Final answer title now uses conversation title (if available) instead of generic "Final Council Answer"
+  - Changed deliberation frame and tool steps from purple to grey theme for visual consistency
+  - Tool steps now use grey color scheme (#757575) to match deliberation frame
+  - Both frames now have consistent styling with light grey background
+
+**Improvements:**
+- **Test Workflow Guidance**: Updated AGENTS.md to clarify testing should use relevant tags
+  - Changed guidance from "run full test suite" to "run relevant tests with tags"
+  - Added example of running specific scenarios
+  - Clarified full test suite only needed for major cross-cutting changes
+
 ### v0.45.3
 **Branch:** `v0.45.3`  
 **Completed:** 2025-12-12 17:12 UTC | 2025-12-12 09:12 PST

@@ -430,7 +430,7 @@ uv run -m tests.test_runner --max-iterations 3
 
 ### Testing Workflow (MANDATORY)
 
-**CRITICAL: Run tests during every implementation cycle.**
+**CRITICAL: Run tests during every implementation cycle. Only test relevant scenarios to save time.**
 
 #### During Implementation
 1. **Before coding**: Run relevant tests to establish baseline
@@ -438,9 +438,13 @@ uv run -m tests.test_runner --max-iterations 3
    uv run -m tests.test_runner --tags <relevant-tags>
    ```
 
-2. **After each significant change**: Re-run tests
+2. **After each significant change**: Re-run tests with relevant tags only
    ```bash
-   uv run -m tests.test_runner
+   # Run only tests relevant to the change (preferred)
+   uv run -m tests.test_runner --tags <relevant-tags>
+   
+   # Or run specific scenario(s) directly
+   uv run -m tests.test_runner --scenario <scenario_name>
    ```
 
 3. **CRITICAL: After EVERY test run, verify test results were generated:**
@@ -471,8 +475,11 @@ uv run -m tests.test_runner --max-iterations 3
 
 6. **Before committing**: All relevant tests MUST pass
    ```bash
-   uv run -m tests.test_runner  # Full test suite
-   # Then verify: tmp/test_results/ has new file with "failed": 0
+   # Run tests relevant to the change - use tags for efficiency
+   uv run -m tests.test_runner --tags <relevant-tags>
+   # Verify: tmp/test_results/ has new file with "failed": 0
+   
+   # Note: Full test suite is only required for major changes affecting multiple areas
    ```
 
 7. **After ALL tests pass**: Commit, merge to master, and push IMMEDIATELY
