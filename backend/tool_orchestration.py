@@ -68,11 +68,13 @@ async def plan_tool_execution(user_query: str, available_tools: Dict[str, Any]) 
     """
     chairman = get_chairman_model()
     
-    # Format tool list for prompt
+    # Format tool list for prompt - available_tools contains MCPTool objects
     tool_descriptions = []
     for tool_name, tool_info in available_tools.items():
-        desc = tool_info.get('description', 'No description')
-        params = tool_info.get('inputSchema', {}).get('properties', {})
+        # MCPTool has attributes: name, description, input_schema, server_name
+        desc = getattr(tool_info, 'description', 'No description')
+        input_schema = getattr(tool_info, 'input_schema', {})
+        params = input_schema.get('properties', {}) if isinstance(input_schema, dict) else {}
         param_list = list(params.keys())[:5]  # First 5 params
         tool_descriptions.append(f"- {tool_name}: {desc} (params: {', '.join(param_list)})")
     

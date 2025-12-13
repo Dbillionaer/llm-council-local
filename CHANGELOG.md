@@ -4,6 +4,16 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.47.1
+**Branch:** `v0.47.1`  
+**Completed:** 2025-12-13 06:20 UTC | 2025-12-12 22:20 PST
+
+**Fixes:**
+- **Orchestration MCPTool Error**: Fixed "'MCPTool' object has no attribute 'get'" error
+  - Root cause: `available_tools` dict contains `MCPTool` objects, not plain dictionaries
+  - Fixed `plan_tool_execution()` to use `getattr()` instead of `.get()` for MCPTool attributes
+  - Correctly accesses `description`, `input_schema` attributes from MCPTool objects
+
 ### v0.47.0
 **Branch:** `v0.47.0`  
 **Completed:** 2025-12-13 05:15 UTC | 2025-12-12 21:15 PST
