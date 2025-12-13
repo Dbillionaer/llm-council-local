@@ -805,7 +805,7 @@ function App() {
             break;
 
           case 'title_complete':
-            // Update conversation title in list
+            // Update conversation title in list and clear generating state
             // Use conversation_id from event if available, fallback to currentConversationId
             const titleConvId = event.conversation_id || currentConversationId;
             console.log('[App] title_complete event received:', { title: event.title, eventConvId: event.conversation_id, closureConvId: currentConversationId, usingConvId: titleConvId });
@@ -818,7 +818,7 @@ function App() {
                 });
                 const updated = prev.map(conv => 
                   conv.id === titleConvId 
-                    ? { ...conv, title: event.title }
+                    ? { ...conv, title: event.title, titleGenerating: false }
                     : conv
                 );
                 console.log('[App] After update:', updated.map(c => ({ id: c.id, title: c.title })));
@@ -1020,7 +1020,7 @@ function App() {
           if (event.title && runCouncilTitleConvId) {
             setConversations(prev => prev.map(conv => 
               conv.id === runCouncilTitleConvId 
-                ? { ...conv, title: event.title }
+                ? { ...conv, title: event.title, titleGenerating: false }
                 : conv
             ));
           }

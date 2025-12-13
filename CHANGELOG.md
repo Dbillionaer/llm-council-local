@@ -4,6 +4,18 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.45.3
+**Branch:** `v0.45.3`  
+**Completed:** 2025-12-12 17:12 UTC | 2025-12-12 09:12 PST
+
+**Fixes:**
+- **Sidebar Title Not Updating After Generation**: Fixed issue where conversation title would generate but not display in sidebar until page refresh
+  - Root cause: SSE `title_complete` event handler was not clearing `titleGenerating` flag
+  - The Sidebar component was checking `conv.titleGenerating` to show "Generating title..." placeholder
+  - When WebSocket set `titleGenerating: true` on generation start, but SSE path didn't clear it
+  - Result: Sidebar kept showing "Generating title..." even after title was generated
+  - Fix: Added `titleGenerating: false` to the conversation state update in both `handleSendMessage` and `runCouncil` handlers
+
 ### v0.45.2
 **Branch:** `v0.45.2`  
 **Completed:** 2025-12-03 17:45 UTC | 2025-12-03 09:45 PST
