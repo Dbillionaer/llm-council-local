@@ -4,6 +4,18 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.47.2
+**Branch:** `v0.47.2`  
+**Completed:** 2025-12-13 06:30 UTC | 2025-12-12 22:30 PST
+
+**Fixes:**
+- **Docker Cleanup on Exit**: Stop Docker containers when app stops (ESC/Ctrl+C)
+  - Updated `cleanup()` function in `start.sh` to stop Docker containers we started
+  - Tracks which containers were started by the script vs already running
+  - Stops both FalkorDB and Graphiti (llm-council-mcp) containers on exit
+  - Only stops containers that were started by this session
+  - Updated exit message to indicate all servers and containers will stop
+
 ### v0.47.1
 **Branch:** `v0.47.1`  
 **Completed:** 2025-12-13 06:20 UTC | 2025-12-12 22:20 PST
