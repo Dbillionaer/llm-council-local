@@ -26,16 +26,25 @@ cleanup() {
     echo ""
     echo "Stopping servers..."
     
-    # Stop backend and frontend
+    # Stop backend and frontend first
     kill $BACKEND_PID $FRONTEND_PID 2>/dev/null
     
-    # Stop and remove Docker containers that we started
+    # Stop and remove Docker containers in REVERSE order (dependencies first)
+    # Graphiti depends on FalkorDB, so Graphiti must be stopped first
     if [ ${#STARTED_CONTAINERS[@]} -gt 0 ]; then
-        echo "Stopping and removing Docker containers..."
-        for container in "${STARTED_CONTAINERS[@]}"; do
+        echo "Stopping and removing Docker containers (in reverse order)..."
+        
+        # Reverse the array
+        reversed=()
+        for ((i=${#STARTED_CONTAINERS[@]}-1; i>=0; i--)); do
+            reversed+=("${STARTED_CONTAINERS[$i]}")
+        done
+        
+        for container in "${reversed[@]}"; do
             if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
-                echo "  Removing $container..."
-                docker stop "$container" >/dev/null 2>&1
+                echo "  Stopping $container (waiting for graceful shutdown)..."
+                # Use timeout to allow graceful shutdown (e.g., pending memory writes)
+                docker stop --time 10 "$container" >/dev/null 2>&1
                 docker rm "$container" >/dev/null 2>&1
             fi
         done

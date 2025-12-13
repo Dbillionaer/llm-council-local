@@ -4,6 +4,16 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.47.5
+**Branch:** `v0.47.5`  
+**Completed:** 2025-12-13 09:12 UTC | 2025-12-13 01:12 PST
+
+**Fixes:**
+- **Docker Shutdown Order & Graceful Exit**: Containers removed in correct order with graceful shutdown
+  - Containers now stopped in REVERSE order (Graphiti first, then FalkorDB it depends on)
+  - Added 10-second graceful shutdown timeout (`docker stop --time 10`) to allow pending operations
+  - This ensures Graphiti can complete pending memory writes before FalkorDB is stopped
+
 ### v0.47.4
 **Branch:** `v0.47.4`  
 **Completed:** 2025-12-13 08:58 UTC | 2025-12-13 00:58 PST
