@@ -99,8 +99,8 @@
     "record_council_responses": true,
     "record_chairman_synthesis": true,
     "categorization_enabled": true,
-    "default_user_name": "Mark",
-    "default_ai_name": "Aether"
+    "default_user_name": "User",
+    "default_ai_name": "Ai"
   },
   "deliberation": {
     "rounds": 2,

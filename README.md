@@ -17,7 +17,40 @@ In a bit more detail, here is what happens when you submit a query:
 
 ## Key Features
 
-### Current Release (v0.45.0)
+### Current Release (v0.51.0)
+- **Self-Improving Research Controller**: Intelligent, learning conversation system with memory integration
+  - Recursive research loop: Think → Research/Build/Answer (max 50 rounds)
+  - Retrieves context from Graphiti memory before processing queries
+  - Records lessons learned back to memory for future use
+  - Can dynamically build new tools via mcp-dev-team when needed
+  - Knowledge categories: facts, processes, lessons, preferences, entities, relationships
+  - Three decision paths: COMPLETE (answer from memory), USE EXISTING (use tool), BUILD NEW (create tool)
+
+### Previous Release (v0.50.1)
+- **MCP Dev Team Tool**: AI-driven MCP server development workflow
+  - `software-dev-org.mcp-dev-team`: Automated MCP server development
+  - Three LLM roles:
+    - **Architect**: Analyzes requirements, identifies tools needed, creates task lists
+    - **Engineer**: Generates code files, creates run.sh for testing
+    - **QA Analyst**: Archives project and tests in sandbox
+  - Three-phase workflow: Research/Planning → Development → Testing
+  - Returns integration instructions with mcp_servers.json snippet
+  - Configurable LLM models (defaults to chairman model)
+
+### Previous Release (v0.50.0)
+- **Software Development Org MCP Server**: Sandboxed code execution and project management
+  - `safe-app-execution`: Execute code in sandboxed Docker container
+    - Builds "llm-council-dev-env" Docker image with Rust, Go, Python, Node.js
+    - No network access (`--network none`) for security
+    - Memory limit (512MB), CPU limit (1 core), 5-minute timeout
+    - Unpacks bzip2 archives and runs run.sh
+  - `write-file`: Write content to project files (creates directories)
+  - `read-file`: Read content from project files
+  - `list-files`: List all files in a project folder
+  - `create-archive`: Create bzip2 archive of a project
+  - Projects stored in `data/dev_projects/`
+
+### Previous Release (v0.45.0)
 - **CFS Groups Dropdown**: Custom filter groups shown in dropdown menu
   - Default groups (All, User, Test) remain as tab buttons
   - Custom groups appear in "More ▾" dropdown
@@ -415,6 +448,33 @@ The application automatically detects your local IP and validates model availabi
       "port": "",
       "base_url_template": "",
       "api_key": ""
+    },
+    "software_architect": {
+      "id": "",
+      "name": "Software Architect",
+      "description": "For mcp-dev-team: analyzes requirements, creates task lists (empty = use chairman)",
+      "ip": "",
+      "port": "",
+      "base_url_template": "",
+      "api_key": ""
+    },
+    "software_dev_engineer": {
+      "id": "",
+      "name": "Software Dev Engineer", 
+      "description": "For mcp-dev-team: generates code files (empty = use software_architect)",
+      "ip": "",
+      "port": "",
+      "base_url_template": "",
+      "api_key": ""
+    },
+    "qa_analyst": {
+      "id": "",
+      "name": "QA Analyst",
+      "description": "For mcp-dev-team: tests in sandbox (empty = use software_architect)",
+      "ip": "",
+      "port": "",
+      "base_url_template": "",
+      "api_key": ""
     }
   },
   "deliberation": {
@@ -674,6 +734,60 @@ curl http://localhost:8001/api/mcp/status | jq
 ```bash
 curl -X POST "http://localhost:8001/api/mcp/call?tool_name=add&arguments={\"a\":5,\"b\":3}"
 ```
+
+### Software Dev Org MCP Server (v0.50.0+)
+
+The `software-dev-org` server provides sandboxed code execution and project management:
+
+**Tools:**
+- `safe-app-execution`: Run code in isolated Docker container
+- `write-file`: Write files to a project folder
+- `read-file`: Read files from a project folder
+- `list-files`: List all files in a project
+- `create-archive`: Create bzip2 archive
+- `mcp-dev-team`: AI-driven MCP server development (v0.50.1+)
+
+**Example: Write and Execute Code**
+```bash
+# Write a Python file
+curl -X POST "http://localhost:8001/api/mcp/call" \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name": "software-dev-org.write-file", "arguments": {"project_name": "hello-world", "filename": "main.py", "content": "print(\"Hello, World!\")"}}'
+
+# Write run.sh
+curl -X POST "http://localhost:8001/api/mcp/call" \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name": "software-dev-org.write-file", "arguments": {"project_name": "hello-world", "filename": "run.sh", "content": "#!/bin/bash\npython3 main.py"}}'
+
+# Create archive
+curl -X POST "http://localhost:8001/api/mcp/call" \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name": "software-dev-org.create-archive", "arguments": {"project_name": "hello-world"}}'
+
+# Execute in sandbox
+curl -X POST "http://localhost:8001/api/mcp/call" \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name": "software-dev-org.safe-app-execution", "arguments": {"archive_path": "data/dev_projects/hello-world.tar.bz2"}}'
+```
+
+**Docker Requirements:**
+- Docker must be running
+- First run builds `llm-council-dev-env` image (~2-3 minutes)
+- Image includes: Ubuntu 22.04, Python 3, Node.js, Rust, Go
+
+**MCP Dev Team Usage (v0.50.1+):**
+```bash
+# Request AI to develop an MCP server
+curl -X POST "http://localhost:8001/api/mcp/call" \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name": "software-dev-org.mcp-dev-team", "arguments": {"query": "Create an MCP server that converts temperatures between Celsius and Fahrenheit"}}'
+```
+
+The mcp-dev-team tool will:
+1. Use the Architect LLM to analyze requirements
+2. Use the Engineer LLM to generate code
+3. Test in the sandbox
+4. Return integration instructions
 
 ### Model Quality Metrics
 
