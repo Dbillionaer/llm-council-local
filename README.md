@@ -385,7 +385,7 @@ The application automatically detects your local IP and validates model availabi
 {
   "server": {
     "ip": "",
-    "port": "11434", 
+    "port": "1234", 
     "base_url_template": "http://{ip}:{port}/v1",
     "api_key": ""
   }
@@ -393,7 +393,7 @@ The application automatically detects your local IP and validates model availabi
 ```
 
 - `ip`: Leave empty for auto-detection, or specify a custom IP address
-- `port`: LM Studio server port (default: 11434)
+- `port`: LM Studio server port (default: 1234)
 - `base_url_template`: URL template for API endpoints
 - `api_key`: Global API key (if required by your LLM server)
 
@@ -510,7 +510,7 @@ Each model supports individual connection settings that override server defaults
 {
   "server": {
     "ip": "192.168.1.111", 
-    "port": "11434",
+    "port": "1234",
     "base_url_template": "http://{ip}:{port}/v1",
     "api_key": ""
   },

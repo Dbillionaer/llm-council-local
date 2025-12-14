@@ -4,6 +4,14 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.52.2
+**Branch:** `v0.52.2`  
+**Completed:** 2025-12-14 09:10 UTC | 2025-12-14 01:10 PST
+
+**Fixes:**
+- **Import Error Fix**: Fixed `cannot import name 'call_model_streaming'` - changed to use `query_model_streaming` from lmstudio module
+- **RC Activation Fix**: Removed pre-RC `check_and_execute_tools` call that was bypassing the Research Controller. RC now truly handles ALL tool decisions.
+
 ### v0.52.1
 **Branch:** `v0.52.1`  
 **Completed:** 2025-12-14 08:52 UTC | 2025-12-14 00:52 PST

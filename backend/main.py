@@ -794,30 +794,9 @@ async def send_message_stream_tokens(conversation_id: str, request: SendMessageR
             classification = await classify_message(request.content, on_event)
             yield f"data: {json.dumps({'type': 'classification_complete', 'classification': classification})}\n\n"
             
-            # Always check for tool usage using LLM-based confidence scoring
-            # The new system uses expectation analysis to determine if tools can help
-            tool_result = None
-            yield f"data: {json.dumps({'type': 'tool_check_start'})}\n\n"
-            tool_result = await check_and_execute_tools(request.content, on_event)
-            
-            # Stream any tool events
-            while not events_queue.empty():
-                event_type, data = events_queue.get_nowait()
-                yield f"data: {json.dumps({'type': event_type, **data})}\n\n"
-            
-            # Send tool_result event for frontend display if tool was used successfully
-            if tool_result and tool_result.get('success'):
-                from .council import format_tool_result_for_prompt
-                tool_context = format_tool_result_for_prompt(tool_result)
-                tool_name = f"{tool_result.get('server')}.{tool_result.get('tool')}"
-                tool_event = {
-                    'type': 'tool_result',
-                    'tool': tool_name,
-                    'input': tool_result.get('input'),
-                    'output': tool_result.get('output'),
-                    'formatted': tool_context
-                }
-                yield f"data: {json.dumps(tool_event)}\n\n"
+            # NOTE: Tool execution is now handled by the Research Controller
+            # The RC decides whether to use tools, build new tools, or escalate to council
+            tool_result = None  # Will be populated by RC if it uses tools
             
             # ===== ROUTING DECISION =====
             msg_type = classification.get("type", "deliberation")
@@ -828,16 +807,17 @@ async def send_message_stream_tokens(conversation_id: str, request: SendMessageR
             yield f"data: {json.dumps({'type': 'research_controller_start', 'reason': 'Research Controller analyzing query'})}\n\n"
             
             # Create LLM query function for the controller
-            from .council import call_model_streaming
+            from .lmstudio import query_model_streaming
             config = load_config()
             chairman_config = config.get("models", {}).get("chairman", {})
+            chairman_model = chairman_config.get("id", "")
             
             async def llm_query_func(messages, timeout=60):
                 """Query the chairman model for research decisions."""
                 try:
                     result = {"content": ""}
-                    async for chunk in call_model_streaming(
-                        chairman_config.get("id", ""),
+                    async for chunk in query_model_streaming(
+                        chairman_model,
                         messages,
                         max_tokens=2000
                     ):
