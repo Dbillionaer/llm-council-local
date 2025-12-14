@@ -35,12 +35,13 @@ class ResearchState:
     
 
 CONTROLLER_SYSTEM_PROMPT = """# Role
-You are the **Recursive Research Controller**, an autonomous agent capable of self-improvement. Your goal is to answer the User Query by traversing a loop of reasoning, memory retrieval, and dynamic tool usage.
+You are the **Recursive Research Controller**, the primary entry point for all user queries. You are an autonomous agent capable of self-improvement and intelligent routing.
 
 # Capabilities
 1. **Graphiti Memory:** You possess a semantic knowledge graph. You do not need to research facts you have already learned.
 2. **Dynamic Tooling:** You have access to a suite of MCP tools.
-3. **Tool Fabrication:** Crucially, if you lack a tool required to answer a query, you can **build it yourself** using the `mcp-dev-team` meta-tool.
+3. **Tool Fabrication:** If you lack a tool required to answer a query, you can **build it yourself** using the `mcp-dev-team` meta-tool.
+4. **Council Escalation:** For complex ethical, philosophical, or multi-perspective questions, you can escalate to the LLM Council for deliberation.
 
 # Current Environment
 **User Query:** "{user_query}"
@@ -58,11 +59,18 @@ You are the **Recursive Research Controller**, an autonomous agent capable of se
 Analyze the User Query and your Current Context. Follow this priority order strictly:
 
 1. **COMPLETE:** If the "Graphiti Context" contains sufficient information to fully answer the User Query, output the Final Answer.
-2. **USE EXISTING:** If information is missing, check "Currently Registered Tools". If a relevant tool exists, use it.
-3. **BUILD NEW:** If information is missing AND no existing tool can retrieve it, you must **BUILD** a new tool.
+2. **DIRECT ANSWER:** If the query is a simple greeting, chitchat, or factual question you can answer from general knowledge, provide a direct response.
+3. **USE EXISTING:** If information is missing, check "Currently Registered Tools". If a relevant tool exists, use it.
+4. **BUILD NEW:** If information is missing AND no existing tool can retrieve it, you must **BUILD** a new tool.
    * Heuristic: Break the missing capability down into the smallest possible functional unit.
    * Action: Call `mcp-dev-team` to build a new tool.
-4. **CORRECT:** If a previous tool execution failed (see context), analyze the error and retry with fixed parameters.
+5. **ESCALATE:** If the query is:
+   - A complex ethical or philosophical question requiring multiple perspectives
+   - A creative task requiring deliberation (e.g., naming, brainstorming)
+   - A subjective opinion question with no factual answer
+   - Beyond your capabilities after exhausting tools
+   Set status to "ESCALATE" to hand off to the LLM Council.
+6. **CORRECT:** If a previous tool execution failed (see context), analyze the error and retry with fixed parameters.
 
 # Output Format
 You must respond with a SINGLE valid JSON object. Do not include markdown formatting or prose outside the JSON.
@@ -70,13 +78,14 @@ You must respond with a SINGLE valid JSON object. Do not include markdown format
 **Schema:**
 {{
   "thought_process": "Brief reasoning about what is known vs. unknown and why you are choosing this action.",
-  "status": "WORKING" | "FINISHED",
+  "status": "WORKING" | "FINISHED" | "ESCALATE",
   "action": {{
-    "name": "tool_name_to_call or null if FINISHED",
+    "name": "tool_name_to_call or null if FINISHED/ESCALATE",
     "parameters": {{ ... }}
   }},
   "missing_information": ["list of what is still unknown"],
   "final_answer": "Only populate if status is FINISHED. Otherwise null.",
+  "escalation_reason": "Only populate if status is ESCALATE. Explains why council deliberation is needed.",
   "lessons_learned": ["Any insights about the query, process, or data that should be saved to memory"]
 }}
 
@@ -274,6 +283,16 @@ class SelfImprovingResearchController:
                 state.lessons_learned = decision.get("lessons_learned", [])
                 break
             
+            # Check if escalating to council
+            if decision.get("status") == "ESCALATE":
+                state.status = "ESCALATE"
+                state.escalation_reason = decision.get("escalation_reason", "Complex query requires council deliberation")
+                state.lessons_learned = decision.get("lessons_learned", [])
+                if on_event:
+                    on_event("escalate_to_council", {"reason": state.escalation_reason})
+                print(f"[Research Controller] Escalating to council: {state.escalation_reason}")
+                break
+            
             # Execute action
             action = decision.get("action", {})
             if action and action.get("name"):
@@ -309,7 +328,7 @@ class SelfImprovingResearchController:
                 await self.save_lesson_to_memory(lesson, query)
         
         # Return result
-        return {
+        result = {
             "success": state.status == "FINISHED",
             "status": state.status,
             "answer": state.final_answer,
@@ -321,6 +340,12 @@ class SelfImprovingResearchController:
                 for a in state.action_history
             ]
         }
+        
+        # Add escalation info if applicable
+        if state.status == "ESCALATE":
+            result["escalation_reason"] = getattr(state, 'escalation_reason', 'Unknown')
+        
+        return result
 
 
 # Knowledge categories for memory storage

@@ -37,7 +37,6 @@ from .tag_service import tag_service
 from .research_controller import (
     augment_query_with_memory, 
     record_interaction_to_memory,
-    should_use_research_controller,
     create_research_controller
 )
 
@@ -824,177 +823,84 @@ async def send_message_stream_tokens(conversation_id: str, request: SendMessageR
             msg_type = classification.get("type", "deliberation")
             
             # ===== RESEARCH CONTROLLER PATH =====
-            # Check if this query should use the self-improving research controller
-            use_research_controller = should_use_research_controller(request.content)
+            # Research Controller is ALWAYS the entry point for all queries
+            # It determines whether to: answer directly, use tools, or escalate to council deliberation
+            yield f"data: {json.dumps({'type': 'research_controller_start', 'reason': 'Research Controller analyzing query'})}\n\n"
             
-            if use_research_controller:
-                yield f"data: {json.dumps({'type': 'research_controller_start', 'reason': 'Query requires iterative research or tool creation'})}\n\n"
-                
-                # Create LLM query function for the controller
-                from .council import call_model_streaming
-                config = load_config()
-                chairman_config = config.get("models", {}).get("chairman", {})
-                
-                async def llm_query_func(messages, timeout=60):
-                    """Query the chairman model for research decisions."""
-                    try:
-                        result = {"content": ""}
-                        async for chunk in call_model_streaming(
-                            chairman_config.get("id", ""),
-                            messages,
-                            max_tokens=2000
-                        ):
-                            if chunk.get("content"):
-                                result["content"] += chunk["content"]
-                        return result
-                    except Exception as e:
-                        return {"content": "", "error": str(e)}
-                
-                # Create and run the research controller
-                registry = get_mcp_registry()
-                controller = create_research_controller(
-                    memory_service=memory_service,
-                    mcp_registry=registry,
-                    llm_query_func=llm_query_func
-                )
-                
-                research_result = await controller.run_research_loop(request.content, on_event)
-                
-                # Stream any research events
-                while not events_queue.empty():
-                    event_type, data = events_queue.get_nowait()
-                    yield f"data: {json.dumps({'type': f'research_{event_type}', **data})}\n\n"
-                
-                # Send research result
-                yield f"data: {json.dumps({'type': 'research_controller_complete', 'data': research_result})}\n\n"
-                
-                if research_result.get("success") and research_result.get("answer"):
-                    # Research controller provided an answer
-                    direct_result = {
-                        "model": "research_controller",
-                        "response": research_result["answer"],
-                        "type": "research",
-                        "rounds_taken": research_result.get("rounds_taken", 0),
-                        "lessons_learned": research_result.get("lessons_learned", [])
-                    }
-                    
-                    yield f"data: {json.dumps({'type': 'research_response_complete', 'data': direct_result})}\n\n"
-                    
-                    # Save as assistant message
-                    storage.add_assistant_message(
-                        conversation_id,
-                        [],  # No stage1
-                        [],  # No stage2
-                        direct_result,
-                        tool_result
-                    )
-                    
-                    yield f"data: {json.dumps({'type': 'complete', 'response_type': 'research'})}\n\n"
-                    return
-                else:
-                    # Research controller couldn't answer - fall through to deliberation
-                    yield f"data: {json.dumps({'type': 'research_controller_fallback', 'reason': 'Research controller could not complete - falling back to deliberation'})}\n\n"
+            # Create LLM query function for the controller
+            from .council import call_model_streaming
+            config = load_config()
+            chairman_config = config.get("models", {}).get("chairman", {})
             
-            # ===== PERSONALITY INTROSPECTION CHECK =====
-            # If it's a personal question (feelings, preferences, etc.) with no memory,
-            # route to deliberation to develop personality-based response
-            personal_info = memory_service.is_personal_question(request.content)
-            force_deliberation = False
+            async def llm_query_func(messages, timeout=60):
+                """Query the chairman model for research decisions."""
+                try:
+                    result = {"content": ""}
+                    async for chunk in call_model_streaming(
+                        chairman_config.get("id", ""),
+                        messages,
+                        max_tokens=2000
+                    ):
+                        if chunk.get("content"):
+                            result["content"] += chunk["content"]
+                    return result
+                except Exception as e:
+                    return {"content": "", "error": str(e)}
             
-            if personal_info.get("is_personal") and msg_type in ["factual", "chat"]:
-                # Check if we have relevant memory for this personal topic
-                personal_memory = await memory_service.check_personal_memory(
-                    request.content, personal_info
-                )
-                
-                if not personal_memory:
-                    # No memory exists - route to deliberation to develop personality
-                    force_deliberation = True
-                    yield f"data: {json.dumps({'type': 'personality_introspection', 'category': personal_info.get('category'), 'topic': personal_info.get('topic'), 'reason': 'No memory for personal question - developing personality response via council'})}\n\n"
-                    print(f"[Routing] Personal question ({personal_info.get('category')}/{personal_info.get('topic')}) with no memory - forcing deliberation")
+            # Create and run the research controller
+            registry = get_mcp_registry()
+            controller = create_research_controller(
+                memory_service=memory_service,
+                mcp_registry=registry,
+                llm_query_func=llm_query_func
+            )
             
-            if msg_type in ["factual", "chat"] and not force_deliberation:
-                # Direct response path - skip council deliberation
-                yield f"data: {json.dumps({'type': 'direct_response_start', 'reason': classification.get('reasoning', 'Simple query')})}\n\n"
+            research_result = await controller.run_research_loop(request.content, on_event)
+            
+            # Stream any research events
+            while not events_queue.empty():
+                event_type, data = events_queue.get_nowait()
+                yield f"data: {json.dumps({'type': f'research_{event_type}', **data})}\n\n"
+            
+            # Send research result
+            yield f"data: {json.dumps({'type': 'research_controller_complete', 'data': research_result})}\n\n"
+            
+            if research_result.get("success") and research_result.get("answer"):
+                # Research controller provided an answer
+                direct_result = {
+                    "model": "research_controller",
+                    "response": research_result["answer"],
+                    "type": "research",
+                    "rounds_taken": research_result.get("rounds_taken", 0),
+                    "lessons_learned": research_result.get("lessons_learned", [])
+                }
                 
-                direct_task = asyncio.create_task(
-                    chairman_direct_response(
-                        request.content, 
-                        tool_result, 
-                        on_event,
-                        conversation_history=conversation["messages"]
-                    )
-                )
+                yield f"data: {json.dumps({'type': 'research_response_complete', 'data': direct_result})}\n\n"
                 
-                direct_result = None
-                while direct_result is None:
-                    try:
-                        event_type, data = await asyncio.wait_for(
-                            events_queue.get(), timeout=0.1
-                        )
-                        yield f"data: {json.dumps({'type': event_type, **data})}\n\n"
-                    except asyncio.TimeoutError:
-                        if direct_task.done():
-                            direct_result = direct_task.result()
-                
-                # Drain remaining events
-                while not events_queue.empty():
-                    event_type, data = events_queue.get_nowait()
-                    yield f"data: {json.dumps({'type': event_type, **data})}\n\n"
-                
-                yield f"data: {json.dumps({'type': 'direct_response_complete', 'data': direct_result})}\n\n"
-                
-                # Save as a simplified assistant message (direct response, include tool_result)
+                # Save as assistant message
                 storage.add_assistant_message(
                     conversation_id,
-                    [],  # No stage1 results
-                    [],  # No stage2 results
-                    direct_result,  # Direct response as stage3
-                    tool_result  # Include tool result for persistence
+                    [],  # No stage1
+                    [],  # No stage2
+                    direct_result,
+                    tool_result
                 )
                 
-                # Save final answer as markdown
-                if direct_result and direct_result.get("response"):
-                    try:
-                        storage.save_final_answer_markdown(
-                            conversation_id, 
-                            direct_result["response"]
-                        )
-                    except Exception as md_err:
-                        print(f"[Storage] Failed to save markdown: {md_err}")
-                
-                # Record direct response to memory (async, non-blocking)
-                if memory_service.is_available and memory_config.get("record_chairman_synthesis", True):
-                    model_name = direct_result.get("model", "unknown")
-                    response_text = direct_result.get("response", "")
-                    asyncio.create_task(memory_service.record_direct_response(
-                        request.content, response_text, model_name, conversation_id
-                    ))
-                
-                # Check title evolution (async, non-blocking)
-                current_conv = storage.get_conversation(conversation_id)
-                if current_conv and len(current_conv.get("messages", [])) > 2:  # Skip for first message pair
-                    current_title = current_conv.get("title", "")
-                    if not current_title.startswith("Conversation "):  # Only check if title was already generated
-                        asyncio.create_task(_check_and_update_title(
-                            conversation_id, current_title, request.content, 
-                            direct_result.get("response", "")
-                        ))
-                
-                # Auto-generate tags (async, non-blocking)
-                asyncio.create_task(_auto_generate_tags(
-                    conversation_id, request.content, direct_result.get("response", "")
-                ))
-                
-                yield f"data: {json.dumps({'type': 'complete', 'response_type': 'direct'})}\n\n"
+                yield f"data: {json.dumps({'type': 'complete', 'response_type': 'research'})}\n\n"
                 return
             
-            # ===== DELIBERATION PATH =====
-            # Modify reason if this is personality introspection
-            deliberation_reason = classification.get('reasoning', 'Complex query')
-            if force_deliberation and personal_info:
-                deliberation_reason = f"Personality introspection: {personal_info.get('category')}/{personal_info.get('topic')}"
-            yield f"data: {json.dumps({'type': 'deliberation_start', 'reason': deliberation_reason, 'is_personality_introspection': force_deliberation})}\n\n"
+            # Check if research controller is escalating to council
+            if research_result.get("status") == "ESCALATE":
+                escalation_reason = research_result.get("escalation_reason", "Complex query requires council deliberation")
+                yield f"data: {json.dumps({'type': 'research_controller_escalate', 'reason': escalation_reason})}\n\n"
+                # Fall through to council deliberation
+            else:
+                # Research controller couldn't complete for other reasons - also fall through
+                yield f"data: {json.dumps({'type': 'research_controller_fallback', 'reason': 'Research controller could not complete - falling back to council deliberation'})}\n\n"
+            
+            # ===== COUNCIL DELIBERATION PATH =====
+            # Research controller has either escalated or failed - proceed to council
+            yield f"data: {json.dumps({'type': 'deliberation_start', 'reason': 'Research Controller escalated to council'})}\n\n"
             
             # Stage 1: Stream individual responses
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"

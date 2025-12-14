@@ -795,6 +795,27 @@
   font-size: 14px;
 }
 
+.research-escalate-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  background: #e3f2fd;
+  border-left: 3px solid #2196f3;
+  border-radius: 0 6px 6px 0;
+  font-size: 12px;
+  color: #1565c0;
+}
+
+.escalate-icon {
+  font-size: 14px;
+}
+
+.escalate-text {
+  flex: 1;
+}
+
 .research-fallback-notice {
   display: flex;
   align-items: center;

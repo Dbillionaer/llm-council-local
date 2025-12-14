@@ -4,6 +4,25 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.52.1
+**Branch:** `v0.52.1`  
+**Completed:** 2025-12-14 08:52 UTC | 2025-12-14 00:52 PST
+
+**Architecture:**
+- **Research Controller as Entry Point**: RC is now ALWAYS the first handler for all queries
+  - Removed pattern-based triggers - RC handles all queries
+  - RC decides: direct answer, use tools, build tools, or escalate to council
+  - Added `ESCALATE` status for RC to hand off to council deliberation
+  - Updated system prompt with new routing logic:
+    1. COMPLETE - answer from memory
+    2. DIRECT ANSWER - simple greetings/chitchat
+    3. USE EXISTING - use available MCP tools
+    4. BUILD NEW - create new tool via mcp-dev-team
+    5. ESCALATE - hand off to council for complex/ethical/philosophical questions
+    6. CORRECT - retry failed tool with fixed parameters
+
+**Note:** Model loading errors (HTTP 400) typically indicate the model is on a different server than configured. Check `config.json` to ensure `server.port` matches your inference server (LM Studio=1234, Ollama=11434) or set per-model endpoints.
+
 ### v0.52.0
 **Branch:** `v0.52.0`  
 **Completed:** 2025-12-14 08:35 UTC | 2025-12-14 00:35 PST

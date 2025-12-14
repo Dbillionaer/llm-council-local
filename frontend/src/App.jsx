@@ -947,6 +947,17 @@ function App() {
             });
             break;
 
+          case 'research_controller_escalate':
+            // Research controller is escalating to council deliberation
+            setCurrentConversation((prev) => {
+              const messages = [...(prev?.messages || [])];
+              const lastMsg = messages[messages.length - 1];
+              lastMsg.researchEscalate = true;
+              lastMsg.escalationReason = event.reason;
+              return { ...prev, messages };
+            });
+            break;
+
           case 'research_controller_fallback':
             // Research controller falling back to deliberation
             setCurrentConversation((prev) => {

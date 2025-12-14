@@ -410,8 +410,18 @@ export default function ChatInterface({
                     </details>
                   )}
 
+                  {/* Research Escalation Notice */}
+                  {msg.researchEscalate && (
+                    <div className="research-escalate-notice">
+                      <span className="escalate-icon">🔀</span>
+                      <span className="escalate-text">
+                        Escalating to Council: {msg.escalationReason || 'Complex query requires deliberation'}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Research Fallback Notice */}
-                  {msg.researchFallback && (
+                  {msg.researchFallback && !msg.researchEscalate && (
                     <div className="research-fallback-notice">
                       <span className="fallback-icon">⚠️</span>
                       <span className="fallback-text">Research controller could not complete - using council deliberation</span>
