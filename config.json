@@ -88,6 +88,33 @@
       "port": "",
       "base_url_template": "",
       "api_key": ""
+    },
+    "software_architect": {
+      "id": "essentialai/rnj-1",
+      "name": "Software Architect",
+      "description": "For mcp-dev-team: analyzes requirements, creates task lists (empty = use chairman)",
+      "ip": "",
+      "port": "",
+      "base_url_template": "",
+      "api_key": ""
+    },
+    "software_dev_engineer": {
+      "id": "mistralai/devstral-small-2-2512",
+      "name": "Software Dev Engineer",
+      "description": "For mcp-dev-team: generates code files (empty = use software_architect)",
+      "ip": "",
+      "port": "",
+      "base_url_template": "",
+      "api_key": ""
+    },
+    "qa_analyst": {
+      "id": "smollm3-3b-gabliterated",
+      "name": "QA Analyst",
+      "description": "For mcp-dev-team: tests in sandbox (empty = use software_architect)",
+      "ip": "",
+      "port": "",
+      "base_url_template": "",
+      "api_key": ""
     }
   },
   "memory": {
