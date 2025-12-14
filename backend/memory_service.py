@@ -171,6 +171,7 @@ class MemoryService:
             return {"user_name": self._user_name, "ai_name": self._ai_name}
         
         if not self._available:
+            print("[Memory] Memory service not available - skipping name loading")
             self._names_loaded = True
             self._names_loading.set()
             return {"user_name": None, "ai_name": None}
@@ -185,60 +186,115 @@ class MemoryService:
                 f"{MEMORY_GROUP_PREFIX}_episodic"
             ]
             
+            print(f"[Memory] Searching for names in groups: {search_groups}")
+            
             # Search for AI name (Aether)
-            ai_result = await registry.call_tool("graphiti.search_nodes", {
-                "query": "Aether AI name assistant known as",
-                "group_ids": search_groups,
-                "max_nodes": 20
-            })
-            
-            nodes = ai_result.get("output", {}).get("structuredContent", {}).get("result", {})
-            if isinstance(nodes, dict):
-                nodes = nodes.get("nodes", [])
-            
-            for node in nodes:
-                name = node.get("name", "") if isinstance(node, dict) else ""
-                summary = node.get("summary", "") if isinstance(node, dict) else ""
+            try:
+                ai_result = await registry.call_tool("graphiti.search_nodes", {
+                    "query": "Aether AI name assistant known as",
+                    "group_ids": search_groups,
+                    "max_nodes": 20
+                })
+                print(f"[Memory] AI name search result: {ai_result}")
                 
-                # Check if this is an Aether reference
-                if name.lower() == "aether" or "aether" in summary.lower():
-                    self._ai_name = "Aether"
-                    print(f"[Memory] Found AI name: Aether")
-                    break
+                # Parse result - handle various response formats
+                nodes = []
+                if ai_result.get("success"):
+                    output = ai_result.get("output", {})
+                    # Try structuredContent format
+                    if isinstance(output, dict) and "structuredContent" in output:
+                        result = output["structuredContent"].get("result", {})
+                        if isinstance(result, dict):
+                            nodes = result.get("nodes", [])
+                        elif isinstance(result, list):
+                            nodes = result
+                    # Try content format (list of text objects)
+                    elif isinstance(output, dict) and "content" in output:
+                        content = output["content"]
+                        if isinstance(content, list) and len(content) > 0:
+                            text = content[0].get("text", "")
+                            try:
+                                parsed = json.loads(text)
+                                if isinstance(parsed, dict):
+                                    nodes = parsed.get("nodes", [])
+                                elif isinstance(parsed, list):
+                                    nodes = parsed
+                            except json.JSONDecodeError:
+                                pass
+                
+                print(f"[Memory] Found {len(nodes)} AI name nodes")
+                for node in nodes:
+                    name = node.get("name", "") if isinstance(node, dict) else ""
+                    summary = node.get("summary", "") if isinstance(node, dict) else ""
+                    
+                    # Check if this is an Aether reference
+                    if name.lower() == "aether" or "aether" in summary.lower():
+                        self._ai_name = "Aether"
+                        print(f"[Memory] Found AI name: Aether")
+                        break
+            except Exception as e:
+                print(f"[Memory] Error searching for AI name: {e}")
             
             # Search for user name (prioritize Mark)
-            user_result = await registry.call_tool("graphiti.search_nodes", {
-                "query": "user name Mark human",
-                "group_ids": search_groups,
-                "max_nodes": 20
-            })
-            
-            nodes = user_result.get("output", {}).get("structuredContent", {}).get("result", {})
-            if isinstance(nodes, dict):
-                nodes = nodes.get("nodes", [])
-            
-            for node in nodes:
-                name = node.get("name", "") if isinstance(node, dict) else ""
-                summary = node.get("summary", "") if isinstance(node, dict) else ""
-                content = f"{name} {summary}".lower()
+            try:
+                user_result = await registry.call_tool("graphiti.search_nodes", {
+                    "query": "user name Mark human",
+                    "group_ids": search_groups,
+                    "max_nodes": 20
+                })
+                print(f"[Memory] User name search result: {user_result}")
                 
-                # Prioritize Mark if found
-                if "mark" in content and ("user" in content or "human" in content):
-                    self._user_name = "Mark"
-                    print(f"[Memory] Found user name: Mark")
-                    break
+                # Parse result - handle various response formats
+                nodes = []
+                if user_result.get("success"):
+                    output = user_result.get("output", {})
+                    # Try structuredContent format
+                    if isinstance(output, dict) and "structuredContent" in output:
+                        result = output["structuredContent"].get("result", {})
+                        if isinstance(result, dict):
+                            nodes = result.get("nodes", [])
+                        elif isinstance(result, list):
+                            nodes = result
+                    # Try content format (list of text objects)
+                    elif isinstance(output, dict) and "content" in output:
+                        content = output["content"]
+                        if isinstance(content, list) and len(content) > 0:
+                            text = content[0].get("text", "")
+                            try:
+                                parsed = json.loads(text)
+                                if isinstance(parsed, dict):
+                                    nodes = parsed.get("nodes", [])
+                                elif isinstance(parsed, list):
+                                    nodes = parsed
+                            except json.JSONDecodeError:
+                                pass
+                
+                print(f"[Memory] Found {len(nodes)} user name nodes")
+                for node in nodes:
+                    name = node.get("name", "") if isinstance(node, dict) else ""
+                    summary = node.get("summary", "") if isinstance(node, dict) else ""
+                    content = f"{name} {summary}".lower()
                     
-                # Fallback to other user name patterns
-                if "user" in content and "name" in content:
-                    extracted = self._extract_name_from_fact(summary, is_user=True)
-                    if extracted and extracted.lower() != "hermes":  # Skip AI confusion
-                        self._user_name = extracted
-                        print(f"[Memory] Found user name: {extracted}")
+                    # Prioritize Mark if found
+                    if "mark" in content and ("user" in content or "human" in content):
+                        self._user_name = "Mark"
+                        print(f"[Memory] Found user name: Mark")
                         break
+                        
+                    # Fallback to other user name patterns
+                    if "user" in content and "name" in content:
+                        extracted = self._extract_name_from_fact(summary, is_user=True)
+                        if extracted and extracted.lower() != "hermes":  # Skip AI confusion
+                            self._user_name = extracted
+                            print(f"[Memory] Found user name: {extracted}")
+                            break
+            except Exception as e:
+                print(f"[Memory] Error searching for user name: {e}")
             
         except Exception as e:
             print(f"[Memory] Error loading names: {e}")
         
+        print(f"[Memory] Name loading complete: user={self._user_name}, ai={self._ai_name}")
         self._names_loaded = True
         self._names_loading.set()
         

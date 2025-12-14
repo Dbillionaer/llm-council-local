@@ -14,9 +14,9 @@ llm:
   providers:
     openai_generic:
       api_key: lms
-      api_url: http://host.docker.internal:11434/v1
+      api_url: http://host.docker.internal:1234/v1
 embedder:
-  provider: lmstudio
+  provider: openai_generic
   model: text-embedding-nomic-embed-text-v1.5@f16
 database:
   provider: falkordb

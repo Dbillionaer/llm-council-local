@@ -451,10 +451,8 @@ def create_research_controller(memory_service=None, mcp_registry=None, llm_query
 
 
 # Keywords and patterns that suggest a query needs the research controller
-RESEARCH_TRIGGERS = [
-    "create an image",
-    "generate an image", 
-    "draw",
+# Two types: exact phrases and keyword combinations
+RESEARCH_TRIGGER_PHRASES = [
     "make a picture",
     "design a",
     "build a",
@@ -469,6 +467,20 @@ RESEARCH_TRIGGERS = [
     "find out",
     "look up",
     "search for",
+]
+
+# Keyword combinations - if ALL keywords in a tuple are present, it's a trigger
+RESEARCH_TRIGGER_KEYWORDS = [
+    ("create", "image"),      # Matches "create an image", "create an artistic image", etc.
+    ("generate", "image"),    # Matches "generate an image", "generate a beautiful image"
+    ("draw", "picture"),      # Matches "draw a picture", "draw me a picture"
+    ("make", "image"),        # Matches "make an image", "make me an image"
+    ("create", "picture"),    # Matches "create a picture"
+]
+
+# Single keywords that are strong indicators
+RESEARCH_TRIGGER_SINGLE = [
+    "draw",  # "draw a cat", "draw something"
 ]
 
 
@@ -490,8 +502,19 @@ def should_use_research_controller(query: str) -> bool:
     """
     query_lower = query.lower()
     
-    for trigger in RESEARCH_TRIGGERS:
+    # Check exact phrases first
+    for trigger in RESEARCH_TRIGGER_PHRASES:
         if trigger in query_lower:
+            return True
+    
+    # Check keyword combinations (all keywords in tuple must be present)
+    for keywords in RESEARCH_TRIGGER_KEYWORDS:
+        if all(kw in query_lower for kw in keywords):
+            return True
+    
+    # Check single strong indicators
+    for keyword in RESEARCH_TRIGGER_SINGLE:
+        if keyword in query_lower:
             return True
     
     return False

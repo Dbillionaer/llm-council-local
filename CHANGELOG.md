@@ -4,6 +4,24 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.52.4
+**Branch:** `v0.52.4`  
+**Completed:** 2025-12-14 09:55 UTC | 2025-12-14 01:55 PST
+
+**Fixes:**
+- **Research Controller Trigger Fix**: Fixed image creation queries going to Deliberation instead of Research Controller
+  - Problem: Exact phrase matching `"create an image"` didn't match `"create an artistic image"` (word in between)
+  - Solution: Split triggers into three categories:
+    - Exact phrases (e.g., "design a", "build a")
+    - Keyword combinations (e.g., ("create", "image") matches regardless of words between)
+    - Single strong indicators (e.g., "draw")
+  - Now correctly routes: `"create an artistic image of a pirate ship"` → Research Controller
+
+- **Memory Name Loading Debug**: Enhanced logging in `load_names_from_memory()` to diagnose name retrieval issues
+  - Added detailed logging for search results and parsing
+  - Fixed result parsing to handle multiple response formats (structuredContent and content formats)
+  - Logs now show exactly what's being searched and found
+
 ### v0.52.3
 **Branch:** `v0.52.3`  
 **Completed:** 2025-12-14 09:20 UTC | 2025-12-14 01:20 PST
