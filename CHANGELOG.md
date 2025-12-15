@@ -4,6 +4,18 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.53.1
+**Branch:** `v0.53.1`  
+**Completed:** 2025-12-15 03:25 UTC | 2025-12-14 19:25 PST
+
+**Fixes:**
+- **Image Generation Query Routing**: Fixed issue where "create an image" queries were incorrectly routed to council deliberation instead of triggering the mcp-dev-team BUILD workflow
+  - Root cause: `_analyze_user_expectations()` didn't recognize `image_generation` as a data type
+  - Fix 1: Added `'image_generation'` to the list of valid data types in the expectations prompt
+  - Fix 2: Added examples for image creation queries (e.g., "Create an image of a pirate ship" → `needs_external_data: true, data_types_needed: ["image_generation"]`)
+  - Fix 3: Added `'image_generation'` → `software-dev-org.mcp-dev-team` mapping in `DATA_TYPE_TO_TOOL`
+  - Now: Image creation requests trigger the mcp-dev-team tool to BUILD an image generation capability
+
 ### v0.53.0
 **Branch:** `v0.53.0`  
 **Completed:** 2025-12-15 03:30 UTC | 2025-12-14 19:30 PST

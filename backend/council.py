@@ -814,7 +814,7 @@ Respond with ONLY a JSON object:
 {{
   "expectations": ["list of 2-4 specific things the user expects in a good answer"],
   "needs_external_data": true/false,
-  "data_types_needed": ["list of data types: 'current_time', 'location', 'news', 'weather', 'calculation', 'web_content', 'none'"],
+  "data_types_needed": ["list of data types: 'current_time', 'location', 'news', 'weather', 'calculation', 'web_content', 'image_generation', 'none'"],
   "reasoning": "brief explanation"
 }}
 
@@ -824,6 +824,7 @@ IMPORTANT RULES:
 - "time", "date", "what day" → needs_external_data: TRUE, data_types_needed: ["current_time"]
 - "weather", "temperature", "forecast" → needs_external_data: TRUE, data_types_needed: ["weather", "news"]
 - **ANY math or calculation** (even simple ones like 2+2) → needs_external_data: TRUE, data_types_needed: ["calculation"]
+- **ANY image creation request** (create image, draw, generate picture, make an image, artistic image) → needs_external_data: TRUE, data_types_needed: ["image_generation"]
 - general knowledge (capitals, definitions, history) → needs_external_data: FALSE, data_types_needed: ["none"]
 - greetings, chat → needs_external_data: FALSE, data_types_needed: ["none"]
 
@@ -835,6 +836,9 @@ Examples:
 - "What is 15*7?" → needs_external_data: true, data_types_needed: ["calculation"]
 - "What is 5 plus 3?" → needs_external_data: true, data_types_needed: ["calculation"]
 - "Calculate 2+2" → needs_external_data: true, data_types_needed: ["calculation"]
+- "Create an image of a pirate ship" → needs_external_data: true, data_types_needed: ["image_generation"]
+- "Draw a picture of a sunset" → needs_external_data: true, data_types_needed: ["image_generation"]
+- "Generate an artistic image" → needs_external_data: true, data_types_needed: ["image_generation"]
 - "What's the capital of France?" → needs_external_data: false, data_types_needed: ["none"]
 - "Hello!" → needs_external_data: false, data_types_needed: ["none"]
 
@@ -917,6 +921,7 @@ async def _evaluate_tool_confidence(
     # Direct mapping from data types to tools
     # For calculator, we use 'calculator.add' as a placeholder - Phase 2 will determine
     # the correct operation (add, subtract, multiply, divide) based on the query
+    # For image_generation, we use mcp-dev-team to BUILD a new image generation tool
     DATA_TYPE_TO_TOOL = {
         'current_time': ('system-date-time.get-system-date-time', 'system-date-time', 0.95),
         'location': ('system-geo-location.get-system-geo-location', 'system-geo-location', 0.95),
@@ -925,6 +930,7 @@ async def _evaluate_tool_confidence(
         'current_events': ('websearch.search', 'websearch', 0.9),
         'calculation': ('calculator', 'calculator', 0.85),  # Server name only - Phase 2 picks operation
         'web_content': ('retrieve-web-page.get-page-from-url', 'retrieve-web-page', 0.8),
+        'image_generation': ('software-dev-org.mcp-dev-team', 'software-dev-org', 0.9),  # BUILD tool for images
     }
     
     # Find the best matching tool based on data types
