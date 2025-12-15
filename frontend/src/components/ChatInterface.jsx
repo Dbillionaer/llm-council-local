@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import MarkdownRenderer from './MarkdownRenderer';
 import ToolSteps from './ToolSteps';
+import DevTeamWorkflow from './DevTeamWorkflow';
 import Stage1 from './Stage1';
 import Stage2 from './Stage2';
 import Stage3 from './Stage3';
@@ -462,6 +463,41 @@ export default function ChatInterface({
                       isComplete={!!msg.stage3 || !msg.streaming}
                     />
                   )}
+
+                  {/* MCP Dev Team workflow display - special handling for software-dev-org.mcp-dev-team */}
+                  {msg.toolSteps && msg.toolSteps.some(s => s.tool?.includes('mcp-dev-team')) && (() => {
+                    const devTeamStep = msg.toolSteps.find(s => s.tool?.includes('mcp-dev-team'));
+                    if (!devTeamStep?.output) return null;
+                    
+                    // Parse output - it could be a string (JSON) or already an object
+                    let workflowData = devTeamStep.output;
+                    if (typeof workflowData === 'string') {
+                      try {
+                        workflowData = JSON.parse(workflowData);
+                      } catch (e) {
+                        return null;
+                      }
+                    }
+                    // Handle MCP response format where output is { content: [{ text: "..." }] }
+                    if (workflowData?.content?.[0]?.text) {
+                      try {
+                        workflowData = JSON.parse(workflowData.content[0].text);
+                      } catch (e) {
+                        return null;
+                      }
+                    }
+                    
+                    return (
+                      <DevTeamWorkflow
+                        workflowData={workflowData}
+                        onUserResponse={workflowData?.status === 'awaiting_plan_validation' ? (response) => {
+                          // Send the response as a new message
+                          onSendMessage(`[mcp-dev-team response] ${response}`);
+                        } : null}
+                        isComplete={workflowData?.status === 'completed'}
+                      />
+                    );
+                  })()}
 
                   {/* Single tool result card - for backward compatibility when no toolSteps */}
                   {/* Only show if toolResult exists but no toolSteps (legacy format) */}

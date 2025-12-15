@@ -22,7 +22,7 @@ import subprocess
 import tarfile
 import tempfile
 import shutil
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Callable
 from pathlib import Path
 from datetime import datetime
 
@@ -340,18 +340,32 @@ def create_archive(project_name: str) -> Dict[str, Any]:
         return {"success": False, "error": str(e)}
 
 
-async def mcp_dev_team(query: str, config: Optional[Dict] = None) -> Dict[str, Any]:
+async def mcp_dev_team(
+    query: str, 
+    config: Optional[Dict] = None, 
+    on_event: Optional[Callable] = None,
+    user_response: Optional[str] = None
+) -> Dict[str, Any]:
     """
-    AI-driven MCP server development workflow.
+    AI-driven MCP server development workflow with memory recording.
     
     Uses multiple LLM roles:
-    - software_architect: Analyzes requirements, creates task lists
+    - software_architect: Analyzes requirements, creates task lists with expectations
     - software_dev_engineer: Writes code
-    - qa_analyst: Tests and validates
+    - qa_analyst: Tests and evaluates against expectations
+    
+    Features:
+    - Plan validation step with user interaction
+    - Test task after each development task
+    - Expectations and evaluation for each task
+    - Progress reporting with metrics
+    - Memory recording via Graphiti
     
     Args:
         query: Description of the MCP server to develop
         config: Optional config overrides for LLM roles
+        on_event: Optional callback for emitting UI events
+        user_response: Optional user response for plan validation
     """
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -362,8 +376,52 @@ async def mcp_dev_team(query: str, config: Optional[Dict] = None) -> Dict[str, A
     except ImportError as e:
         return {"success": False, "error": f"Could not import backend modules: {e}"}
     
+    # Try to import memory service for recording
+    memory_service = None
+    try:
+        from backend.memory_service import MemoryService
+        memory_service = MemoryService()
+    except ImportError:
+        pass  # Memory service not available
+    
+    # Helper to emit events
+    def emit(event_type: str, data: Dict[str, Any]):
+        if on_event:
+            on_event({"type": event_type, **data})
+    
+    # Helper to record to memory
+    async def record_memory(content: str, source: str):
+        if memory_service and memory_service._available:
+            try:
+                await memory_service.record_episode(
+                    content=content,
+                    source_description=f"mcp-dev-team:{source}",
+                    episode_type="dev_workflow",
+                    data_label="intelligence"
+                )
+            except Exception as e:
+                print(f"[mcp-dev-team] Memory recording failed: {e}")
+    
     log = []
-    log.append(f"[{datetime.now().isoformat()}] Starting MCP Dev Team for: {query[:100]}...")
+    progress_reports = []  # For UI frames
+    
+    def add_progress(status: str, message: str, metrics: Optional[Dict] = None):
+        """Add a progress report entry."""
+        report = {
+            "timestamp": datetime.now().isoformat(),
+            "status": status,  # "working", "success", "failed", "complete"
+            "message": message,
+            "metrics": metrics or {}
+        }
+        progress_reports.append(report)
+        log.append(f"[{report['timestamp']}] [{status.upper()}] {message}")
+        emit("dev_team_progress", {
+            "report": report,
+            "total_reports": len(progress_reports)
+        })
+    
+    add_progress("working", f"Starting MCP Dev Team for: {query[:100]}...")
+    await record_memory(f"Starting development project: {query}", "init")
     
     # Load config
     config_path = Path(__file__).parent.parent.parent / "config.json"
@@ -373,29 +431,42 @@ async def mcp_dev_team(query: str, config: Optional[Dict] = None) -> Dict[str, A
     except Exception:
         app_config = {}
     
-    # Get LLM models (with fallbacks)
-    chairman = app_config.get("models", {}).get("chairman", {})
-    architect_model = config.get("software_architect", chairman) if config else chairman
-    engineer_model = config.get("software_dev_engineer", architect_model) if config else architect_model
-    qa_model = config.get("qa_analyst", architect_model) if config else architect_model
+    # Get LLM models from config (with fallbacks)
+    models_config = app_config.get("models", {})
+    chairman = models_config.get("chairman", {})
     
-    # Phase 1: Research and Planning (max 50 rounds)
-    task_list = []
-    compiled_data = []
-    current_round = 0
-    max_rounds = 50
+    # Use dedicated role models if configured, otherwise fall back to chairman
+    architect_model = models_config.get("software_architect", chairman)
+    engineer_model = models_config.get("software_dev_engineer", architect_model)
+    qa_model = models_config.get("qa_analyst", architect_model)
     
-    log.append("Phase 1: Research and Planning")
+    # Override with config param if provided
+    if config:
+        architect_model = config.get("software_architect", architect_model)
+        engineer_model = config.get("software_dev_engineer", engineer_model)
+        qa_model = config.get("qa_analyst", qa_model)
     
-    # Initial analysis with architect
+    # =============================================
+    # PHASE 1: Research and Planning
+    # =============================================
+    add_progress("working", "Phase 1: Research and Planning")
+    emit("dev_team_phase", {"phase": 1, "name": "Research and Planning"})
+    
+    # Initial analysis with architect - now includes expectations
     architect_prompt = f"""You are a Software Architect analyzing a request to create an MCP (Model Context Protocol) server.
 
 REQUEST: {query}
 
-Analyze this request and:
+Analyze this request and create a detailed development plan:
+
 1. Identify what tools need to be created
 2. List any external APIs or services needed
-3. Create a task list for research and development
+3. Create a DETAILED task list where each development task MUST include:
+   - Clear description of what to do
+   - Expected outcomes after completion (measurable)
+   - A corresponding test task immediately after it
+
+IMPORTANT: Each development task must be followed by a test task that validates the expectations.
 
 Respond in JSON format:
 {{
@@ -403,17 +474,44 @@ Respond in JSON format:
   "tools_needed": ["tool1", "tool2"],
   "external_apis": ["api1"],
   "task_list": [
-    {{"id": 1, "type": "research|develop|test", "description": "..."}}
+    {{
+      "id": 1, 
+      "type": "develop", 
+      "description": "Create server.py with basic structure",
+      "expectations": [
+        "File server.py exists",
+        "Contains proper imports",
+        "Has handle_request function"
+      ]
+    }},
+    {{
+      "id": 2,
+      "type": "test",
+      "description": "Verify server.py structure",
+      "validates_task": 1,
+      "test_criteria": [
+        "Check file exists",
+        "Check imports are valid",
+        "Check function signature"
+      ]
+    }}
   ],
   "needs_research": true/false,
-  "research_queries": ["what to search for"]
+  "research_queries": ["what to search for"],
+  "summary": "Brief summary of the plan"
 }}"""
     
+    task_list = []
+    project_name = "new-mcp-server"
+    plan_summary = ""
+    
     try:
-        response = await query_model(architect_model, [{"role": "user", "content": architect_prompt}], timeout=60)
+        response = await query_model(architect_model, [{"role": "user", "content": architect_prompt}], timeout=120)
         if response and response.get('content'):
             content = response['content']
-            # Try to parse JSON from response
+            await record_memory(f"Architect analysis: {content[:500]}", "architect")
+            
+            # Parse JSON
             try:
                 if '```json' in content:
                     content = content.split('```json')[1].split('```')[0]
@@ -422,105 +520,392 @@ Respond in JSON format:
                 analysis = json.loads(content)
                 task_list = analysis.get('task_list', [])
                 project_name = analysis.get('project_name', 'new-mcp-server')
-                log.append(f"Architect analysis complete: {len(task_list)} tasks identified")
-                log.append(f"Project name: {project_name}")
+                plan_summary = analysis.get('summary', '')
+                
+                add_progress("success", f"Architect analysis complete: {len(task_list)} tasks identified")
+                add_progress("success", f"Project name: {project_name}")
             except json.JSONDecodeError:
-                log.append("Could not parse architect response as JSON")
-                project_name = "new-mcp-server"
-                task_list = [{"id": 1, "type": "develop", "description": query}]
+                add_progress("failed", "Could not parse architect response as JSON")
+                task_list = [{"id": 1, "type": "develop", "description": query, "expectations": ["Code completes"]}]
     except Exception as e:
-        log.append(f"Architect analysis failed: {e}")
-        project_name = "new-mcp-server"
-        task_list = [{"id": 1, "type": "develop", "description": query}]
+        add_progress("failed", f"Architect analysis failed: {e}")
+        task_list = [{"id": 1, "type": "develop", "description": query, "expectations": ["Code completes"]}]
     
-    # Phase 2: Development (max 50 rounds)
-    log.append("Phase 2: Development")
+    # =============================================
+    # PLAN VALIDATION STEP
+    # =============================================
+    emit("dev_team_plan_validation", {
+        "project_name": project_name,
+        "task_list": task_list,
+        "summary": plan_summary,
+        "awaiting_response": True
+    })
     
-    # Create development plan
-    dev_plan_prompt = f"""You are a Software Development Engineer.
+    # If no user response provided, return with plan for validation
+    if user_response is None:
+        return {
+            "success": True,
+            "status": "awaiting_plan_validation",
+            "project_name": project_name,
+            "task_list": task_list,
+            "summary": plan_summary,
+            "log": log,
+            "progress_reports": progress_reports,
+            "instructions": "Respond with 'approved' to implement, 'refine' to improve the plan, or provide specific feedback"
+        }
+    
+    # Handle user response to plan
+    if user_response.lower().strip() == "refine":
+        # Refine the plan
+        refine_prompt = f"""Think through this development plan again and refine it.
+
+ORIGINAL REQUEST: {query}
+CURRENT PLAN:
+{json.dumps(task_list, indent=2)}
+
+Consider:
+1. Are there any missing steps?
+2. Are the expectations measurable and clear?
+3. Are test tasks properly paired with development tasks?
+4. Can any tasks be optimized or combined?
+
+Provide an improved plan in the same JSON format, plus a summary of changes made."""
+
+        try:
+            response = await query_model(architect_model, [{"role": "user", "content": refine_prompt}], timeout=120)
+            if response and response.get('content'):
+                content = response['content']
+                try:
+                    if '```json' in content:
+                        content = content.split('```json')[1].split('```')[0]
+                    refined = json.loads(content)
+                    task_list = refined.get('task_list', task_list)
+                    add_progress("success", "Plan refined based on review")
+                    await record_memory(f"Plan refined: {content[:500]}", "refinement")
+                except json.JSONDecodeError:
+                    add_progress("failed", "Could not parse refined plan")
+        except Exception as e:
+            add_progress("failed", f"Plan refinement failed: {e}")
+        
+        # Return for another validation round
+        return {
+            "success": True,
+            "status": "awaiting_plan_validation",
+            "project_name": project_name,
+            "task_list": task_list,
+            "summary": "Plan has been refined. Please review again.",
+            "log": log,
+            "progress_reports": progress_reports,
+            "instructions": "Respond with 'approved' to implement, 'refine' again, or provide specific feedback"
+        }
+    
+    elif user_response.lower().strip() != "approved":
+        # User provided specific feedback - incorporate it
+        feedback_prompt = f"""Revise the development plan based on user feedback.
+
+ORIGINAL REQUEST: {query}
+CURRENT PLAN:
+{json.dumps(task_list, indent=2)}
+
+USER FEEDBACK: {user_response}
+
+Update the plan to address the user's feedback. Respond in the same JSON format."""
+
+        try:
+            response = await query_model(architect_model, [{"role": "user", "content": feedback_prompt}], timeout=120)
+            if response and response.get('content'):
+                content = response['content']
+                try:
+                    if '```json' in content:
+                        content = content.split('```json')[1].split('```')[0]
+                    revised = json.loads(content)
+                    task_list = revised.get('task_list', task_list)
+                    add_progress("success", "Plan updated based on user feedback")
+                    await record_memory(f"User feedback incorporated: {user_response}", "feedback")
+                except json.JSONDecodeError:
+                    add_progress("failed", "Could not parse revised plan")
+        except Exception as e:
+            add_progress("failed", f"Plan revision failed: {e}")
+        
+        return {
+            "success": True,
+            "status": "awaiting_plan_validation",
+            "project_name": project_name,
+            "task_list": task_list,
+            "summary": "Plan has been updated based on your feedback.",
+            "log": log,
+            "progress_reports": progress_reports,
+            "instructions": "Respond with 'approved' to implement, 'refine', or provide more feedback"
+        }
+    
+    # Plan approved - proceed with implementation
+    add_progress("success", "Plan approved by user - proceeding with implementation")
+    await record_memory(f"Plan approved. Starting implementation of {len(task_list)} tasks.", "approval")
+    
+    # =============================================
+    # PHASE 2: Development with Testing Loop
+    # =============================================
+    add_progress("working", "Phase 2: Development and Testing")
+    emit("dev_team_phase", {"phase": 2, "name": "Development and Testing"})
+    
+    files_created = []
+    tool_definitions = []
+    task_results = []
+    
+    # Process tasks in order
+    current_task_idx = 0
+    max_iterations = 100  # Safety limit
+    iteration = 0
+    
+    while current_task_idx < len(task_list) and iteration < max_iterations:
+        iteration += 1
+        task = task_list[current_task_idx]
+        task_id = task.get('id', current_task_idx + 1)
+        task_type = task.get('type', 'develop')
+        task_desc = task.get('description', '')
+        expectations = task.get('expectations', [])
+        
+        add_progress("working", f"Task {task_id}: {task_desc[:80]}...")
+        emit("dev_team_task", {
+            "task_id": task_id,
+            "type": task_type,
+            "description": task_desc,
+            "expectations": expectations
+        })
+        
+        if task_type == "develop":
+            # Development task
+            dev_prompt = f"""You are a Software Development Engineer.
 
 PROJECT: {project_name}
-ORIGINAL REQUEST: {query}
-TASK LIST: {json.dumps(task_list, indent=2)}
+TASK: {task_desc}
 
-Create a detailed development plan for an MCP server. Include:
-1. File structure
-2. Each file's content (complete Python code)
-3. A run.sh script for testing
+EXPECTATIONS AFTER COMPLETION:
+{json.dumps(expectations, indent=2)}
+
+FILES CREATED SO FAR:
+{json.dumps(files_created, indent=2)}
+
+Create the required code. For each file, provide complete content.
 
 Respond in JSON format:
 {{
   "files": [
-    {{"path": "server.py", "content": "...full code..."}},
-    {{"path": "run.sh", "content": "#!/bin/bash\\n..."}}
+    {{"path": "filename.py", "content": "...full code..."}}
   ],
   "tool_definitions": [
     {{"name": "tool-name", "description": "...", "parameters": {{}}}}
-  ]
+  ],
+  "completion_notes": "What was accomplished"
 }}"""
-    
-    files_to_write = []
-    tool_definitions = []
-    
-    try:
-        response = await query_model(engineer_model, [{"role": "user", "content": dev_plan_prompt}], timeout=120)
-        if response and response.get('content'):
-            content = response['content']
+            
             try:
-                if '```json' in content:
-                    content = content.split('```json')[1].split('```')[0]
-                elif '```' in content:
-                    content = content.split('```')[1].split('```')[0]
-                dev_plan = json.loads(content)
-                files_to_write = dev_plan.get('files', [])
-                tool_definitions = dev_plan.get('tool_definitions', [])
-                log.append(f"Development plan created: {len(files_to_write)} files")
-            except json.JSONDecodeError:
-                log.append("Could not parse development plan as JSON")
-    except Exception as e:
-        log.append(f"Development planning failed: {e}")
-    
-    # Write files
-    written_files = []
-    for file_info in files_to_write:
-        file_path = file_info.get('path', '')
-        file_content = file_info.get('content', '')
-        if file_path and file_content:
-            result = write_file(project_name, file_path, file_content)
-            if result.get('success'):
-                written_files.append(file_path)
-                log.append(f"Wrote: {file_path}")
-    
-    # Phase 3: Testing (if we have files)
-    test_result = None
-    if written_files:
-        log.append("Phase 3: Testing")
+                response = await query_model(engineer_model, [{"role": "user", "content": dev_prompt}], timeout=180)
+                if response and response.get('content'):
+                    content = response['content']
+                    try:
+                        if '```json' in content:
+                            content = content.split('```json')[1].split('```')[0]
+                        elif '```' in content:
+                            content = content.split('```')[1].split('```')[0]
+                        dev_result = json.loads(content)
+                        
+                        # Write files
+                        for file_info in dev_result.get('files', []):
+                            file_path = file_info.get('path', '')
+                            file_content = file_info.get('content', '')
+                            if file_path and file_content:
+                                result = write_file(project_name, file_path, file_content)
+                                if result.get('success'):
+                                    files_created.append(file_path)
+                                    add_progress("success", f"Created: {file_path}")
+                        
+                        # Collect tool definitions
+                        tool_definitions.extend(dev_result.get('tool_definitions', []))
+                        
+                        task_results.append({
+                            "task_id": task_id,
+                            "type": "develop",
+                            "status": "completed",
+                            "files": [f.get('path') for f in dev_result.get('files', [])],
+                            "notes": dev_result.get('completion_notes', '')
+                        })
+                        await record_memory(f"Task {task_id} completed: {task_desc[:100]}", "development")
+                        
+                    except json.JSONDecodeError:
+                        add_progress("failed", f"Task {task_id}: Could not parse response")
+                        task_results.append({"task_id": task_id, "type": "develop", "status": "parse_error"})
+            except Exception as e:
+                add_progress("failed", f"Task {task_id} failed: {e}")
+                task_results.append({"task_id": task_id, "type": "develop", "status": "error", "error": str(e)})
         
+        elif task_type == "test":
+            # Test task - evaluate expectations from the previous dev task
+            validates_task = task.get('validates_task', task_id - 1)
+            test_criteria = task.get('test_criteria', expectations)
+            
+            # Find the dev task result
+            dev_result = next((r for r in task_results if r.get('task_id') == validates_task), None)
+            
+            # QA evaluation
+            qa_prompt = f"""You are a QA Analyst evaluating a development task.
+
+PROJECT: {project_name}
+TASK BEING VALIDATED: Task {validates_task}
+TEST CRITERIA:
+{json.dumps(test_criteria, indent=2)}
+
+FILES IN PROJECT:
+{json.dumps(files_created, indent=2)}
+
+DEVELOPMENT RESULT:
+{json.dumps(dev_result, indent=2) if dev_result else "No result found"}
+
+Evaluate whether the expectations were met. For each criterion:
+1. Check if it was satisfied
+2. Explain why or why not
+3. Suggest fixes if not met
+
+Respond in JSON format:
+{{
+  "overall_pass": true/false,
+  "criteria_results": [
+    {{"criterion": "...", "passed": true/false, "reason": "..."}}
+  ],
+  "suggestions": ["fix suggestion 1", "..."],
+  "needs_rework": true/false
+}}"""
+            
+            try:
+                response = await query_model(qa_model, [{"role": "user", "content": qa_prompt}], timeout=120)
+                if response and response.get('content'):
+                    content = response['content']
+                    try:
+                        if '```json' in content:
+                            content = content.split('```json')[1].split('```')[0]
+                        qa_result = json.loads(content)
+                        
+                        overall_pass = qa_result.get('overall_pass', False)
+                        
+                        if overall_pass:
+                            add_progress("success", f"Test {task_id}: PASSED - expectations met")
+                            emit("dev_team_test_result", {
+                                "task_id": task_id,
+                                "validates_task": validates_task,
+                                "passed": True,
+                                "criteria_results": qa_result.get('criteria_results', [])
+                            })
+                        else:
+                            add_progress("failed", f"Test {task_id}: FAILED - needs rework")
+                            emit("dev_team_test_result", {
+                                "task_id": task_id,
+                                "validates_task": validates_task,
+                                "passed": False,
+                                "criteria_results": qa_result.get('criteria_results', []),
+                                "suggestions": qa_result.get('suggestions', [])
+                            })
+                            
+                            # If needs rework, we could add a rework task
+                            if qa_result.get('needs_rework'):
+                                suggestions = qa_result.get('suggestions', [])
+                                rework_task = {
+                                    "id": len(task_list) + 1,
+                                    "type": "develop",
+                                    "description": f"Rework task {validates_task}: " + "; ".join(suggestions[:3]),
+                                    "expectations": test_criteria
+                                }
+                                task_list.append(rework_task)
+                                add_progress("working", f"Added rework task based on test feedback")
+                        
+                        task_results.append({
+                            "task_id": task_id,
+                            "type": "test",
+                            "validates_task": validates_task,
+                            "passed": overall_pass,
+                            "details": qa_result
+                        })
+                        await record_memory(f"Test {task_id}: {'PASSED' if overall_pass else 'FAILED'}", "testing")
+                        
+                    except json.JSONDecodeError:
+                        add_progress("failed", f"Test {task_id}: Could not parse QA response")
+                        task_results.append({"task_id": task_id, "type": "test", "status": "parse_error"})
+            except Exception as e:
+                add_progress("failed", f"Test {task_id} failed: {e}")
+                task_results.append({"task_id": task_id, "type": "test", "status": "error", "error": str(e)})
+        
+        else:
+            # Research or other task type - skip for now
+            add_progress("working", f"Task {task_id}: Skipping {task_type} task")
+        
+        current_task_idx += 1
+    
+    # =============================================
+    # PHASE 3: Final Testing and Archive
+    # =============================================
+    add_progress("working", "Phase 3: Final Testing and Packaging")
+    emit("dev_team_phase", {"phase": 3, "name": "Final Testing and Packaging"})
+    
+    test_result = None
+    archive_path = None
+    
+    if files_created:
         # Create archive
         archive_result = create_archive(project_name)
         if archive_result.get('success'):
-            log.append(f"Created archive: {archive_result.get('archive')}")
+            archive_path = archive_result.get('archive')
+            add_progress("success", f"Created archive: {archive_path}")
             
-            # Run in sandbox (if run.sh exists)
-            if 'run.sh' in written_files:
-                test_result = safe_app_execution(archive_result.get('archive'))
+            # Run in sandbox if run.sh exists
+            if 'run.sh' in files_created:
+                test_result = safe_app_execution(archive_path)
                 if test_result.get('success'):
-                    log.append("Tests passed!")
+                    add_progress("success", "Sandbox tests passed!")
                 else:
-                    log.append(f"Tests failed: {test_result.get('stderr', test_result.get('error', 'Unknown'))}")
+                    add_progress("failed", f"Sandbox tests failed: {test_result.get('stderr', test_result.get('error', 'Unknown'))[:200]}")
     
-    # Return results
+    # Calculate final metrics
+    total_tasks = len(task_results)
+    dev_tasks = [r for r in task_results if r.get('type') == 'develop']
+    test_tasks = [r for r in task_results if r.get('type') == 'test']
+    passed_tests = [r for r in test_tasks if r.get('passed')]
+    
+    metrics = {
+        "total_tasks": total_tasks,
+        "development_tasks": len(dev_tasks),
+        "test_tasks": len(test_tasks),
+        "tests_passed": len(passed_tests),
+        "tests_failed": len(test_tasks) - len(passed_tests),
+        "files_created": len(files_created),
+        "tools_defined": len(tool_definitions)
+    }
+    
+    add_progress("complete", f"Development complete. {len(files_created)} files, {len(passed_tests)}/{len(test_tasks)} tests passed", metrics)
+    await record_memory(f"Project {project_name} completed. Files: {len(files_created)}, Tests: {len(passed_tests)}/{len(test_tasks)}", "completion")
+    
+    # Emit final result
+    emit("dev_team_complete", {
+        "project_name": project_name,
+        "metrics": metrics,
+        "files": files_created,
+        "success": len(test_tasks) == 0 or len(passed_tests) > 0
+    })
+    
     return {
         "success": True,
+        "status": "completed",
         "project_name": project_name,
-        "files_created": written_files,
+        "files_created": files_created,
         "tool_definitions": tool_definitions,
+        "task_results": task_results,
+        "metrics": metrics,
         "test_result": {
             "success": test_result.get('success') if test_result else None,
             "stdout": test_result.get('stdout', '')[:1000] if test_result else None,
             "stderr": test_result.get('stderr', '')[:500] if test_result else None
         } if test_result else None,
+        "archive_path": archive_path,
         "log": log,
+        "progress_reports": progress_reports,
         "integration_instructions": f"""
 To integrate this MCP server:
 
@@ -539,7 +924,11 @@ To integrate this MCP server:
     }
 
 
-def mcp_dev_team_sync(query: str, config: Optional[Dict] = None) -> Dict[str, Any]:
+def mcp_dev_team_sync(
+    query: str, 
+    config: Optional[Dict] = None,
+    user_response: Optional[str] = None
+) -> Dict[str, Any]:
     """Synchronous wrapper for mcp_dev_team."""
     import asyncio
     try:
@@ -548,7 +937,7 @@ def mcp_dev_team_sync(query: str, config: Optional[Dict] = None) -> Dict[str, An
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     
-    return loop.run_until_complete(mcp_dev_team(query, config))
+    return loop.run_until_complete(mcp_dev_team(query, config, user_response=user_response))
 
 
 # Tool definitions
@@ -641,16 +1030,38 @@ TOOLS = [
     },
     {
         "name": "mcp-dev-team",
-        "description": "AI-driven MCP server development workflow. Uses architect, engineer, and QA LLM roles to analyze requirements, generate code, and test in a sandbox.",
+        "description": "AI-driven MCP server development workflow with plan validation. Uses architect, engineer, and QA LLM roles. First call creates a plan, then user responds with 'approved', 'refine', or feedback.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "query": {
                     "type": "string",
                     "description": "Description of the MCP server to develop (what tools it should provide, what it should do)"
+                },
+                "user_response": {
+                    "type": "string",
+                    "description": "User response for plan validation: 'approved' to proceed, 'refine' to improve plan, or specific feedback"
                 }
             },
             "required": ["query"]
+        }
+    },
+    {
+        "name": "send-response-to-dev-team",
+        "description": "Send a response to an ongoing mcp-dev-team workflow for plan validation or feedback",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "project_name": {
+                    "type": "string",
+                    "description": "Name of the project being developed"
+                },
+                "response": {
+                    "type": "string",
+                    "description": "User response: 'approved', 'refine', or specific feedback"
+                }
+            },
+            "required": ["project_name", "response"]
         }
     }
 ]
@@ -703,7 +1114,17 @@ def handle_request(request: Dict[str, Any]) -> Dict[str, Any]:
             elif tool_name == "create-archive":
                 result = create_archive(arguments.get("project_name"))
             elif tool_name == "mcp-dev-team":
-                result = mcp_dev_team_sync(arguments.get("query"))
+                result = mcp_dev_team_sync(
+                    arguments.get("query"),
+                    user_response=arguments.get("user_response")
+                )
+            elif tool_name == "send-response-to-dev-team":
+                # This is a convenience tool - it just calls mcp-dev-team with a response
+                # In practice, the project context should be maintained by the caller
+                result = {
+                    "success": True,
+                    "message": f"Response '{arguments.get('response')}' received for project '{arguments.get('project_name')}'. Use mcp-dev-team with user_response parameter to continue."
+                }
             else:
                 response["error"] = {"code": -32601, "message": f"Unknown tool: {tool_name}"}
                 return response

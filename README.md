@@ -17,7 +17,23 @@ In a bit more detail, here is what happens when you submit a query:
 
 ## Key Features
 
-### Current Release (v0.52.6)
+### Current Release (v0.53.0)
+- **Enhanced MCP Dev Team Workflow**: Major overhaul of the mcp-dev-team tool
+  - **Memory Recording**: All dev team conversations recorded to Graphiti memory
+  - **Structured Planning**: Each development task includes measurable expectations
+  - **Test-Driven Development**: Automatic test task after each dev task
+  - **Expectation Evaluation**: QA analyst evaluates whether expectations were met
+  - **Adaptive Planning**: Failed tests trigger automatic rework tasks
+  - **Plan Validation**: User can approve, refine, or provide feedback before implementation
+  - **Progress Reporting**: Metrics and status updates throughout workflow
+
+- **DevTeamWorkflow UI Component**: Gold-themed dev team visualization
+  - Orange plan validation section with approve/refine buttons
+  - Color-coded progress: blue (expectations met), red (failed), green (complete)
+  - Collapsible task list with expectation details
+  - Final metrics grid (tasks, tests passed, files created)
+
+### Previous Release (v0.52.x)
 - **Research Controller UI Improvements**: Enhanced visibility of Research Controller operations
   - Intent classification step shows classification result and reasoning
   - Memory search step shows facts and tools found

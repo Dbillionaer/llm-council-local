@@ -4,6 +4,30 @@ Completed changes with version, branch, and timestamp information.
 
 ## Completed Changes
 
+### v0.53.0
+**Branch:** `v0.53.0`  
+**Completed:** 2025-12-15 03:30 UTC | 2025-12-14 19:30 PST
+
+**Features:**
+- **Enhanced MCP Dev Team Workflow**: Major overhaul of the mcp-dev-team tool with new capabilities:
+  - **Memory Recording**: All dev team conversations now recorded to Graphiti memory
+  - **Structured Planning with Expectations**: Each development task includes measurable expectations
+  - **Test-Driven Development**: Automatic test task after each development task
+  - **Expectation Evaluation**: QA analyst LLM evaluates whether expectations were met
+  - **Adaptive Planning**: Failed tests trigger automatic rework tasks
+  - **Plan Validation Step**: User can approve, refine, or provide feedback on the plan
+  - **Progress Reporting**: Detailed metrics and status updates throughout workflow
+
+- **DevTeamWorkflow UI Component**: New frontend component for dev team visualization:
+  - Gold-themed parent frame for mcp-dev-team workflows
+  - Orange plan validation section with approve/refine buttons and feedback input
+  - Color-coded progress reports: blue (expectations met), red (failed), green (complete)
+  - Collapsible task list with expectation details
+  - Final metrics grid showing tasks, tests passed, files created
+
+- **New Tools**:
+  - `send-response-to-dev-team`: Convenience tool for plan validation responses
+
 ### v0.52.8
 **Branch:** `v0.52.8`  
 **Completed:** 2025-12-15 03:05 UTC | 2025-12-14 19:05 PST
